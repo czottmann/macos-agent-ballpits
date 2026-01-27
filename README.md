@@ -50,7 +50,8 @@ COMMAND:
 
 The launcher mounts your host Claude configuration:
 
-- `~/.claude` → `/home/claude/.claude` (auth, settings, project data)
+- `~/.claude` → `/home/claude/.claude` (project data, settings)
+- `~/.claude-sandbox.json` → `/home/claude/.claude.json` (sandbox-specific auth)
 
 This means:
 - You authenticate once and it persists across sessions

@@ -263,6 +263,12 @@ set -a docker_args -w (pwd)
 # Mount host Claude config (for auth and settings)
 set -a docker_args -v "$HOME/.claude:/home/claude/.claude"
 
+# Mount sandbox-specific claude.json (create if missing to avoid Docker creating a directory)
+if not test -f "$HOME/.claude-sandbox.json"
+    echo '{}' > "$HOME/.claude-sandbox.json"
+end
+set -a docker_args -v "$HOME/.claude-sandbox.json:/home/claude/.claude.json"
+
 # Mount read-only directories
 set -l mount_index 1
 for ro_path in $ro_mounts
