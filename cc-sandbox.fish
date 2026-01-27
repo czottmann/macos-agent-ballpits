@@ -249,6 +249,12 @@ if not $keep_container
     set -a docker_args --rm
 end
 
+# Pass terminal environment for proper colors
+set -a docker_args -e TERM
+if set -q COLORTERM
+    set -a docker_args -e COLORTERM
+end
+
 # Mount workspace (mirror full host path)
 set -a docker_args -v (pwd):(pwd)
 set -a docker_args -w (pwd)
