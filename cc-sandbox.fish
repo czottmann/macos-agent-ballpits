@@ -75,21 +75,20 @@ function init_mcp_config
 
     mkdir -p (dirname "$host_mcp_config")
 
-    # Build config with detected MCP servers
-    set -l config '{"mcpServers":{'
-    set -l first true
+    # Start with xcodebuildmcp
+    set -l config (jq -n '{
+        mcpServers: {
+            xcodebuildmcp: {command: "npx", args: ["-y", "xcodebuildmcp"], port: 8001}
+        }
+    }')
 
-    # Always include xcodebuildmcp
-    set config "$config\"xcodebuildmcp\":{\"command\":\"npx\",\"args\":[\"-y\",\"xcodebuildmcp\"],\"port\":8001}"
-    set first false
-
-    # Include cupertino if installed
+    # Add cupertino if installed
     if command -q cupertino
         set -l cupertino_path (command -s cupertino)
-        set config "$config,\"cupertino\":{\"command\":\"$cupertino_path\",\"args\":[\"serve\"],\"port\":8002}"
+        set config (echo "$config" | jq --arg cmd "$cupertino_path" \
+            '.mcpServers.cupertino = {command: $cmd, args: ["serve"], port: 8002}')
     end
 
-    set config "$config}}"
     echo "$config" | jq . >"$host_mcp_config"
 
     echo "Created $host_mcp_config"
@@ -153,23 +152,17 @@ function start_mcp_servers
     # Generate guest MCP config
     echo "Generating guest MCP config…"
 
-    set -l guest_config '{"mcpServers":{'
-    set -l first true
+    set -l guest_config (jq -n '{mcpServers: {}}')
 
     for server in $servers
         set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
-
-        if not $first
-            set guest_config "$guest_config,"
-        end
-        set first false
-
-        set guest_config "$guest_config\"$server\":{\"type\":\"sse\",\"url\":\"http://host.internal:$port/sse\"}"
+        set guest_config (echo "$guest_config" | jq \
+            --arg server "$server" \
+            --arg url "http://host.internal:$port/sse" \
+            '.mcpServers[$server] = {type: "sse", url: $url}')
     end
 
-    set guest_config "$guest_config}}"
-
-    echo "$guest_config" | jq . >"$guest_mcp_config"
+    echo "$guest_config" >"$guest_mcp_config"
     set generated_mcp_config true
 
     echo "  Created $guest_mcp_config"
