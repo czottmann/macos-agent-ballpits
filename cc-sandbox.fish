@@ -132,7 +132,7 @@ function start_mcp_servers
         set -a supergateway_pids $pid
 
         # Wait for port to be ready (up to 30 seconds) with spinner
-        if not gum spin --title "    Waiting for $server…" -- fish -c "
+        if not gum spin --title "Waiting for $server…" -- fish -c "
             for attempt in (seq 1 30)
                 if nc -z 127.0.0.1 $port 2>/dev/null
                     exit 0
