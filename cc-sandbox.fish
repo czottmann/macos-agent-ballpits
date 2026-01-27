@@ -269,6 +269,11 @@ if not test -f "$HOME/.claude-sandbox.json"
 end
 set -a docker_args -v "$HOME/.claude-sandbox.json:/home/claude/.claude.json"
 
+# Mount host pi-coding-agent config
+if test -d "$HOME/.pi"
+    set -a docker_args -v "$HOME/.pi:/home/claude/.pi"
+end
+
 # Mount read-only directories
 set -l mount_index 1
 for ro_path in $ro_mounts
