@@ -262,9 +262,6 @@ set -a docker_args -w (pwd)
 
 # Mount host Claude config (for auth and settings)
 set -a docker_args -v "$HOME/.claude:/home/claude/.claude"
-if test -f "$HOME/.claude.json"
-    set -a docker_args -v "$HOME/.claude.json:/home/claude/.claude.json"
-end
 
 # Mount read-only directories
 set -l mount_index 1
