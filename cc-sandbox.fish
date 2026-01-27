@@ -27,7 +27,7 @@ cc-sandbox
 Launch Claude Code in a sandboxed OrbStack Docker container.
 
 USAGE:
-    cc-sandbox [OPTIONS] [-- CLAUDE_ARGS...]
+    cc-sandbox [OPTIONS] [-- CLAUDE_ARGS…]
 
 OPTIONS:
     --ro PATH       Add a read-only mount (can be repeated)
@@ -36,9 +36,10 @@ OPTIONS:
     --help          Show this help
 
 EXAMPLES:
-    cc-sandbox                          # Launch in current directory
+    cc-sandbox                          # Launch CC in current directory
     cc-sandbox --ro ~/Documents         # With read-only ~/Documents
     cc-sandbox -- --help                # Pass --help to claude
+    cc-sandbox -- pi                    # Launch pi
     cc-sandbox --init-mcp               # Create MCP config
 
 REQUIRES:
@@ -107,7 +108,7 @@ function start_mcp_servers
         exit 1
     end
 
-    echo "Starting MCP servers..."
+    echo "Starting MCP servers…"
 
     # Read server configs
     set -l servers (jq -r '.mcpServers | keys[]' "$host_mcp_config")
@@ -117,7 +118,7 @@ function start_mcp_servers
         set -l args (jq -r ".mcpServers[\"$server\"].args | join(\" \")" "$host_mcp_config")
         set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
 
-        echo "  Starting $server on port $port..."
+        echo "  Starting $server on port $port…"
 
         # Build the full command (handle empty args)
         set -l full_command "$command"
@@ -133,7 +134,7 @@ function start_mcp_servers
         set -a supergateway_pids $pid
 
         # Wait for port to be ready (up to 30 seconds) with spinner
-        if not gum spin --title "    Waiting for $server..." -- fish -c "
+        if not gum spin --title "    Waiting for $server…" -- fish -c "
             for attempt in (seq 1 30)
                 if nc -z 127.0.0.1 $port 2>/dev/null
                     exit 0
@@ -151,7 +152,7 @@ function start_mcp_servers
     end
 
     # Generate guest MCP config
-    echo "Generating guest MCP config..."
+    echo "Generating guest MCP config…"
 
     set -l guest_config '{"mcpServers":{'
     set -l first true
@@ -178,7 +179,7 @@ end
 # --- Build Image ---
 function ensure_image
     if not docker image inspect "$image_name" >/dev/null 2>&1
-        echo "Building $image_name image..."
+        echo "Building $image_name image…"
         docker build -t "$image_name" "$script_dir"
         or begin
             echo "Error: Failed to build image" >&2
@@ -274,18 +275,18 @@ if test -d "$HOME/.pi"
     set -a docker_args -v "$HOME/.pi:/home/claude/.pi"
 end
 
-# Mount read-only directories
-set -l mount_index 1
+# Mount read-only directories (mirror full host path, like workspace)
 for ro_path in $ro_mounts
-    # Expand path
+    # Expand path (handles ~ and env vars)
     set -l expanded_path (eval echo $ro_path)
     if not test -d "$expanded_path"
         echo "Error: $expanded_path is not a directory" >&2
         cleanup
         exit 1
     end
-    set -a docker_args -v "$expanded_path:/ro$mount_index:ro"
-    set mount_index (math $mount_index + 1)
+    # Resolve to absolute path
+    set -l abs_path (realpath "$expanded_path")
+    set -a docker_args -v "$abs_path:$abs_path:ro"
 end
 
 # Image and command
@@ -299,12 +300,18 @@ end
 
 # Show what we're doing
 echo ""
-echo "Launching Claude Code sandbox..."
+echo "Launching agents sandbox…"
 echo "  Workspace: "(pwd)" (r/w)"
 echo "  Config: ~/.claude -> /home/claude/.claude (r/w)"
+echo "  Config: ~/.claude-sandbox.json -> /home/claude/.claude.json (r/w)"
+if test -d "$HOME/.pi"
+    echo "  Config: ~/.pi -> /home/claude/.pi (r/w)"
+end
 if test (count $ro_mounts) -gt 0
-    for i in (seq 1 (count $ro_mounts))
-        echo "  Read-only: $ro_mounts[$i] -> /ro$i"
+    for ro_path in $ro_mounts
+        set -l expanded_path (eval echo $ro_path)
+        set -l abs_path (realpath "$expanded_path")
+        echo "  Read-only: $abs_path (r/o)"
     end
 end
 if test -f "$host_mcp_config"
