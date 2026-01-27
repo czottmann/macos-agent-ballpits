@@ -1,0 +1,310 @@
+#!/usr/bin/env fish
+
+# cc-sandbox - Launch Claude Code in a sandboxed OrbStack container
+
+# --- Preconditions ---
+for cmd in docker jq gum
+    if not command -q $cmd
+        echo "Error: $cmd is required but not installed" >&2
+        exit 1
+    end
+end
+
+# --- Configuration ---
+set -g script_dir (dirname (status filename))
+set -g image_name "cc-sandbox"
+set -g host_mcp_config ".claude/cc-sandbox-host.mcp.json"
+set -g guest_mcp_config ".mcp.json"
+set -g supergateway_pids
+set -g original_context ""
+set -g generated_mcp_config false
+
+# --- Help ---
+function usage
+    echo '
+cc-sandbox
+
+Launch Claude Code in a sandboxed OrbStack Docker container.
+
+USAGE:
+    cc-sandbox [OPTIONS] [-- CLAUDE_ARGS...]
+
+OPTIONS:
+    --ro PATH       Add a read-only mount (can be repeated)
+    --keep          Keep the container after exit (don'\''t use --rm)
+    --init-mcp      Create default MCP config file and exit
+    --help          Show this help
+
+EXAMPLES:
+    cc-sandbox                          # Launch in current directory
+    cc-sandbox --ro ~/Documents         # With read-only ~/Documents
+    cc-sandbox -- --help                # Pass --help to claude
+    cc-sandbox --init-mcp               # Create MCP config
+
+REQUIRES:
+    - docker
+    - jq
+    - gum
+    - OrbStack running
+    - supergateway (npm) if using MCP servers
+'
+end
+
+# --- Cleanup ---
+function cleanup
+    # Kill all supergateway processes we started
+    pkill -f "supergateway.*--port" 2>/dev/null
+
+    # Restore docker context
+    if test -n "$original_context"
+        docker context use "$original_context" >/dev/null 2>&1
+    end
+
+    # Remove generated MCP config
+    if $generated_mcp_config; and test -f "$guest_mcp_config"
+        rm -f "$guest_mcp_config"
+    end
+end
+
+# --- Init MCP Config ---
+function init_mcp_config
+    if test -f "$host_mcp_config"
+        echo "MCP config already exists: $host_mcp_config"
+        exit 1
+    end
+
+    mkdir -p (dirname "$host_mcp_config")
+
+    # Build config with detected MCP servers
+    set -l config '{"mcpServers":{'
+    set -l first true
+
+    # Always include xcodebuildmcp
+    set config "$config\"xcodebuildmcp\":{\"command\":\"npx\",\"args\":[\"-y\",\"xcodebuildmcp\"],\"port\":8001}"
+    set first false
+
+    # Include cupertino if installed
+    if command -q cupertino
+        set -l cupertino_path (command -s cupertino)
+        set config "$config,\"cupertino\":{\"command\":\"$cupertino_path\",\"args\":[\"serve\"],\"port\":8002}"
+    end
+
+    set config "$config}}"
+    echo "$config" | jq . >"$host_mcp_config"
+
+    echo "Created $host_mcp_config"
+    echo "Edit this file to configure MCP servers, then run cc-sandbox."
+end
+
+# --- Start MCP Servers ---
+function start_mcp_servers
+    if not test -f "$host_mcp_config"
+        return 0
+    end
+
+    if not command -q npx
+        echo "Error: npx is required for MCP servers but not installed" >&2
+        exit 1
+    end
+
+    echo "Starting MCP servers..."
+
+    # Read server configs
+    set -l servers (jq -r '.mcpServers | keys[]' "$host_mcp_config")
+
+    for server in $servers
+        set -l command (jq -r ".mcpServers[\"$server\"].command" "$host_mcp_config")
+        set -l args (jq -r ".mcpServers[\"$server\"].args | join(\" \")" "$host_mcp_config")
+        set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
+
+        echo "  Starting $server on port $port..."
+
+        # Build the full command (handle empty args)
+        set -l full_command "$command"
+        if test -n "$args"
+            set full_command "$command $args"
+        end
+
+        # Start supergateway in background (log to temp file for debugging)
+        set -l logfile "/tmp/supergateway-$server-"(random)".log"
+        nohup npx -y supergateway --stdio "$full_command" --port "$port" >"$logfile" 2>&1 &
+        disown
+        set -l pid $last_pid
+        set -a supergateway_pids $pid
+
+        # Wait for port to be ready (up to 30 seconds) with spinner
+        if not gum spin --title "    Waiting for $server..." -- fish -c "
+            for attempt in (seq 1 30)
+                if nc -z 127.0.0.1 $port 2>/dev/null
+                    exit 0
+                end
+                sleep 1
+            end
+            exit 1
+        "
+            echo "Error: supergateway for $server failed to start (port $port not listening after 30s)" >&2
+            echo "Log output:" >&2
+            cat "$logfile" >&2
+            cleanup
+            exit 1
+        end
+    end
+
+    # Generate guest MCP config
+    echo "Generating guest MCP config..."
+
+    set -l guest_config '{"mcpServers":{'
+    set -l first true
+
+    for server in $servers
+        set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
+
+        if not $first
+            set guest_config "$guest_config,"
+        end
+        set first false
+
+        set guest_config "$guest_config\"$server\":{\"type\":\"sse\",\"url\":\"http://host.internal:$port/sse\"}"
+    end
+
+    set guest_config "$guest_config}}"
+
+    echo "$guest_config" | jq . >"$guest_mcp_config"
+    set generated_mcp_config true
+
+    echo "  Created $guest_mcp_config"
+end
+
+# --- Build Image ---
+function ensure_image
+    if not docker image inspect "$image_name" >/dev/null 2>&1
+        echo "Building $image_name image..."
+        docker build -t "$image_name" "$script_dir"
+        or begin
+            echo "Error: Failed to build image" >&2
+            exit 1
+        end
+    end
+end
+
+# --- Parse Arguments ---
+set -l ro_mounts
+set -l keep_container false
+set -l claude_args
+
+set -l i 1
+while test $i -le (count $argv)
+    switch $argv[$i]
+        case --help
+            usage
+            exit 0
+        case --init-mcp
+            init_mcp_config
+            exit 0
+        case --ro
+            set i (math $i + 1)
+            if test $i -gt (count $argv)
+                echo "Error: --ro requires a path argument" >&2
+                exit 1
+            end
+            set -a ro_mounts $argv[$i]
+        case --keep
+            set keep_container true
+        case --
+            set i (math $i + 1)
+            set claude_args $argv[$i..-1]
+            break
+        case '-*'
+            echo "Error: Unknown option: $argv[$i]" >&2
+            usage
+            exit 1
+        case '*'
+            echo "Error: Unexpected argument: $argv[$i]" >&2
+            usage
+            exit 1
+    end
+    set i (math $i + 1)
+end
+
+# --- Main ---
+
+# Set up cleanup trap
+trap cleanup EXIT INT TERM
+
+# Save and switch docker context
+set original_context (docker context show)
+if test "$original_context" != "orbstack"
+    docker context use orbstack >/dev/null 2>&1
+    or begin
+        echo "Error: Failed to switch to orbstack context. Is OrbStack running?" >&2
+        exit 1
+    end
+end
+
+# Ensure image exists
+ensure_image
+
+# Start MCP servers if configured
+start_mcp_servers
+
+# Build docker run arguments
+set -l docker_args run
+if isatty stdin
+    set -a docker_args -it
+end
+if not $keep_container
+    set -a docker_args --rm
+end
+
+# Mount workspace (mirror full host path)
+set -a docker_args -v (pwd):(pwd)
+set -a docker_args -w (pwd)
+
+# Mount host Claude config (for auth and settings)
+set -a docker_args -v "$HOME/.claude:/home/claude/.claude"
+if test -f "$HOME/.claude.json"
+    set -a docker_args -v "$HOME/.claude.json:/home/claude/.claude.json"
+end
+
+# Mount read-only directories
+set -l mount_index 1
+for ro_path in $ro_mounts
+    # Expand path
+    set -l expanded_path (eval echo $ro_path)
+    if not test -d "$expanded_path"
+        echo "Error: $expanded_path is not a directory" >&2
+        cleanup
+        exit 1
+    end
+    set -a docker_args -v "$expanded_path:/ro$mount_index:ro"
+    set mount_index (math $mount_index + 1)
+end
+
+# Image and command
+set -a docker_args "$image_name"
+# Use provided command or default to claude with --dangerously-skip-permissions
+if test (count $claude_args) -gt 0
+    set -a docker_args $claude_args
+else
+    set -a docker_args claude --dangerously-skip-permissions
+end
+
+# Show what we're doing
+echo ""
+echo "Launching Claude Code sandbox..."
+echo "  Workspace: "(pwd)" (r/w)"
+echo "  Config: ~/.claude -> /home/claude/.claude (r/w)"
+if test (count $ro_mounts) -gt 0
+    for i in (seq 1 (count $ro_mounts))
+        echo "  Read-only: $ro_mounts[$i] -> /ro$i"
+    end
+end
+if test -f "$host_mcp_config"
+    echo "  MCP servers: "(jq -r '.mcpServers | keys | join(", ")' "$host_mcp_config")
+end
+echo ""
+
+# Run container
+docker $docker_args
+
+# Cleanup happens via trap

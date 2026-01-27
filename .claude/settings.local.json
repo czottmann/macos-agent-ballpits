@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker context use:*)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(docker images:*)",
+      "Bash(./cc-sandbox.fish:*)",
+      "Bash(docker context show:*)",
+      "Bash(/opt/homebrew/bin/cupertino doctor:*)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  }
+}
