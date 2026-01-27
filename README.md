@@ -5,17 +5,17 @@ Run Claude Code in a sandboxed Docker container via OrbStack with controlled fil
 ## Security Model
 
 - **R/W access**: Current working directory (mounted at exact same path)
-- **R/O access**: Additional directories via `--ro` flag
+- **R/O access**: Additional directories via `--ro` flag (mounted at exact same paths)
 - **Isolation**: Non-root user inside container, Docker's native mount restrictions
 - **MCP access**: Host MCP servers exposed via SSE (supergateway)
-- **Permissions**: Claude runs with `--dangerously-skip-permissions` (the sandbox *is* the safety boundary)
+- **Permissions**: Claude automatically runs with `--dangerously-skip-permissions` (the sandbox *is* the safety boundary)
 
 ## Prerequisites
 
-- [OrbStack](https://orbstack.dev/) running
-- `jq` (for JSON processing)
-- `gum` (for spinners)
-- `supergateway` via npm (only if using MCP servers)
+- [OrbStack](https://orbstack.dev/) — provides Docker runtime and CLI
+- `jq` — JSON processing
+- `gum` — terminal spinners
+- `supergateway` via npm — only if using MCP servers
 
 ## Quick Start
 
@@ -23,10 +23,13 @@ Run Claude Code in a sandboxed Docker container via OrbStack with controlled fil
 # First run: builds the image automatically
 ./cc-sandbox.fish
 
+# Run pre-installed pi-coding-agent instead of Claude Code
+./cc-sandbox.fish -- pi
+
 # With read-only access to additional directories
 ./cc-sandbox.fish --ro ~/Documents --ro ~/Reference
 
-# Run a different command instead of claude
+# Run a shell for manual exploration
 ./cc-sandbox.fish -- bash
 ```
 
@@ -48,10 +51,11 @@ COMMAND:
 
 ## Persistent Config
 
-The launcher mounts your host Claude configuration:
+The launcher mounts your host configuration:
 
 - `~/.claude` → `/home/claude/.claude` (project data, settings)
 - `~/.claude-sandbox.json` → `/home/claude/.claude.json` (sandbox-specific auth)
+- `~/.pi` → `/home/claude/.pi` (pi-coding-agent config, if present)
 
 This means:
 - You authenticate once and it persists across sessions
@@ -60,11 +64,12 @@ This means:
 
 ## Workspace Mounting
 
-The workspace is mounted at the exact same path as on the host:
+The workspace and read-only mounts use the same paths in host and container:
 
-| Host path | Container path |
-|-----------|----------------|
-| `/Users/you/Code/my-app` | `/Users/you/Code/my-app` |
+| Host path | Container path | Access |
+|-----------|----------------|--------|
+| `/Users/you/Code/my-app` | `/Users/you/Code/my-app` | r/w |
+| `/Users/you/Documents` (via `--ro`) | `/Users/you/Documents` | r/o |
 
 This ensures Claude Code's project-specific configs match exactly between host and container.
 
@@ -74,7 +79,7 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
 
 ### Setup
 
-1. Create MCP config (auto-detects installed servers):
+1. Create MCP config for the current project/folder (auto-detects installed servers):
    ```fish
    ./cc-sandbox.fish --init-mcp
    ```
@@ -106,13 +111,13 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
 
 1. Launcher reads `.claude/cc-sandbox-host.mcp.json`
 2. Starts a supergateway instance for each MCP server (bridges stdio to SSE)
-3. Generates `.mcp.json` with SSE URLs for the container
+3. Generates `.mcp.json` with SSE URLs for the container (**NOTE: this overwrites any existing file!**)
 4. Claude Code inside container connects to MCP servers via `http://host.internal:<port>/sse`
 5. On exit, supergateway processes are killed automatically
 
 ### Adding MCP Servers
 
-Edit `.claude/cc-sandbox-host.mcp.json`:
+Edit `<project-root>/.claude/cc-sandbox-host.mcp.json`:
 
 ```json
 {
@@ -139,7 +144,7 @@ docker build -t cc-sandbox .
 
 | File | Purpose |
 |------|---------|
-| `Dockerfile` | Alpine + Claude Code + dev tools |
+| `Dockerfile` | Debian + Claude Code + pi + dev tools |
 | `cc-sandbox.fish` | Launcher script |
 | `.claude/cc-sandbox-host.mcp.json` | Host MCP server config (per-project) |
 | `.mcp.json` | Generated guest config (gitignore this) |
@@ -147,16 +152,13 @@ docker build -t cc-sandbox .
 ## Included Tools
 
 The container includes:
+- [Claude Code](https://claude.com/product/claude-code)
+- [pi-coding-agent](https://shittycodingagent.ai/)
 - bash, git, curl
-- Node.js, npm
-- ripgrep, fd, sd
-- Claude Code
+- Node.js, npm, Go
+- ripgrep, fd, sd, jq
+- [beans](https://github.com/hmans/beans) (flat-file issue tracker for humans and robots)
 
 ## Docker Context
 
-The launcher automatically:
-1. Saves your current Docker context
-2. Switches to `orbstack` context
-3. Restores the original context on exit
-
-This allows you to use OrbStack for sandboxing while keeping Docker Desktop as your default.
+The launcher automatically switches to the `orbstack` Docker context and restores your previous context on exit.

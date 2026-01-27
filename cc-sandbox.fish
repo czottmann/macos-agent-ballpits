@@ -37,17 +37,16 @@ OPTIONS:
 
 EXAMPLES:
     cc-sandbox                          # Launch CC in current directory
+    cc-sandbox -- pi                    # Launch pi in current directory
     cc-sandbox --ro ~/Documents         # With read-only ~/Documents
     cc-sandbox -- --help                # Pass --help to claude
-    cc-sandbox -- pi                    # Launch pi
     cc-sandbox --init-mcp               # Create MCP config
 
 REQUIRES:
-    - docker
-    - jq
-    - gum
-    - OrbStack running
-    - supergateway (npm) if using MCP servers
+    - OrbStack running (https://orbstack.dev/, provides docker)
+    - jq (https://jqlang.org/)
+    - gum (https://github.com/charmbracelet/gum)
+    - supergateway (https://github.com/supercorp-ai/supergateway, if using MCP)
 '
 end
 
