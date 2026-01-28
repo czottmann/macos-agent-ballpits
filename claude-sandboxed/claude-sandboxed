@@ -279,4 +279,10 @@ sandbox-exec \
     -D "HOME=$HOME" \
     claude --dangerously-skip-permissions $claude_args
 
+# Reset terminal state (Claude enables focus tracking and keyboard protocols
+# that may not be properly disabled when exiting from sandbox)
+printf '\e[?1004l'  # Disable focus tracking
+printf '\e[<u'      # Pop keyboard enhancement mode
+stty sane 2>/dev/null
+
 # Cleanup happens via trap
