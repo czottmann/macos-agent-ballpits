@@ -166,6 +166,10 @@ The container includes:
 - ripgrep, fd, sd, jq
 - [beans](https://github.com/hmans/beans) (flat-file issue tracker for humans and robots)
 
+## Known Limitations
+
+- **Git credentials**: Git inside the container currently lacks authentication/credentials, preventing operations like push, pull, and clone from authenticated repos. See [ccsandbox-1y6z](/.beans/ccsandbox-1y6z--set-up-git-credentials-in-orbstack-vm.md).
+
 ## Docker Context
 
 The launcher automatically switches to the `orbstack` Docker context and restores your previous context on exit.

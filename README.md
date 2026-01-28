@@ -1,12 +1,20 @@
 # Ballpits: Securing Claude Code and Agents on macOS
 
-This is my personal take on sandboxing Claude Code and similar AI agents. I'm scratching my own itch here—restricting file write access so agents can only modify the current project and a few config directories.
+**Just a show-and-tell, basically, not a full-fledged project.**
 
-This is an opinionated setup! I love fish shell, I dig [gum](https://github.com/charmbracelet/gum). The upside is that the scripts are documented and rather easy to read and translate. It's also a show-and-tell, not a full-fledged project, mind.
+This is my personal take on sandboxing Claude Code and similar AI agents.
 
-No guarantees, no claims of bulletproof security. I might be wrong about some of this. Use at your own risk.
+## Problem statement
 
-Feel free to mix and match.
+I want to run LLM agents inside clearly defined boundaries on macOS to restrict file write access. I want a sandbox to put them in, one they can't break. I want read-write access to the current folder, and configurable optional read-only access to others. I want the agents to be able to build Xcode projects (because that's what I do), which is usually not as easy, lest you set up a full macOS VM with a full Xcode setup inside, and … nope.
+
+## Disclaimer
+
+I'm scratching my own itch here—restricting file write access so agents can only modify the current project and a few config directories. None of this is rocket science, but I was learning a few things, and sharing is caring.
+
+This is an opinionated setup! I love fish shell, I dig [gum](https://github.com/charmbracelet/gum). The upside is that the scripts are documented and rather easy to read and translate.
+
+No guarantees, no claims of bulletproof security. I might be wrong about some of this. Use at your own risk. Feel free to mix and match!
 
 ## Two Approaches
 
