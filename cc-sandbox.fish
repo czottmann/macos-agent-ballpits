@@ -75,16 +75,13 @@ function init_mcp_config
 
     mkdir -p (dirname "$host_mcp_config")
 
-    # Start with xcodebuildmcp (including env var example)
+    # Start with xcsift-mcp
     set -l config (jq -n '{
         mcpServers: {
-            xcodebuildmcp: {
-                command: "npx",
-                args: ["-y", "xcodebuildmcp@latest"],
-                port: 8001,
-                env: {
-                    XCODEBUILDMCP_CLAUDE_CODE_WORKAROUND: "true"
-                }
+            "xcsift-mcp": {
+                command: "xcsift-mcp",
+                args: [],
+                port: 8001
             }
         }
     }')

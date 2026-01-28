@@ -75,7 +75,7 @@ This ensures Claude Code's project-specific configs match exactly between host a
 
 ## MCP Server Integration
 
-The sandbox can connect to MCP servers running on your host via [supergateway](https://github.com/supercorp-ai/supergateway).
+The sandbox can connect to MCP servers running on your host via [supergateway](https://github.com/supercorp-ai/supergateway). By default, it configures [xcsift-mcp](https://github.com/johnnyclem/xcsift-mcp) for Xcode/Swift development (and [cupertino](https://github.com/mihaelamj/cupertino) if installed).
 
 ### Setup
 
@@ -88,13 +88,10 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
    ```json
    {
      "mcpServers": {
-       "xcodebuildmcp": {
-         "command": "npx",
-         "args": ["-y", "xcodebuildmcp@latest"],
-         "port": 8001,
-         "env": {
-           "XCODEBUILDMCP_CLAUDE_CODE_WORKAROUND": "true"
-         }
+       "xcsift-mcp": {
+         "command": "xcsift-mcp",
+         "args": [],
+         "port": 8001
        },
        "cupertino": {
          "command": "/opt/homebrew/bin/cupertino",
