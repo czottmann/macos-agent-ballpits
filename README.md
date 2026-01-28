@@ -6,7 +6,14 @@ This is my personal take on sandboxing Claude Code and similar AI agents.
 
 ## Problem statement
 
-I want to run LLM agents inside clearly defined boundaries on macOS to restrict file write access. I want a sandbox to put them in, one they can't break. I want read-write access to the current folder, and configurable optional read-only access to others. I want the agents to be able to build Xcode projects (because that's what I do), which is usually not as easy, lest you set up a full macOS VM with a full Xcode setup inside, and … nope.
+I want…
+
+1. to run LLM agents inside clearly defined boundaries on macOS to restrict file write access.
+1. a sandbox to put them in, one they can't break.
+1. read-write access to the current folder, and configurable optional read-only access to others.
+1. the agents to be able to build Xcode projects (because that's what I do), which is usually not as easy, lest you set up a full macOS VM with a full Xcode setup inside, and … nope.
+
+Also, I want that thing to boot up in less than 5s.
 
 ## Disclaimer
 
