@@ -1,0 +1,46 @@
+;; Seatbelt profile for Claude Code sandbox
+;; Uses deny-by-default for writes, allowing only specific paths
+;;
+;; Parameters (passed via sandbox-exec -D):
+;;   WORKDIR - The working directory (full write access)
+;;   HOME    - User's home directory (for path construction)
+
+(version 1)
+
+;; Allow most operations by default
+(allow default)
+
+;; Deny all file writes, then allow specific paths
+(deny file-write*)
+
+(allow file-write*
+    ;; Working directory (full write access)
+    (subpath (param "WORKDIR"))
+
+    ;; Claude Code configuration and state
+    (subpath (string-append (param "HOME") "/.claude"))
+    (literal (string-append (param "HOME") "/.claude.json"))
+
+    ;; Temporary directories
+    (subpath "/tmp")
+    (subpath "/var/folders")
+    (subpath "/private/tmp")
+    (subpath "/private/var/folders")
+
+    ;; Home directory caches
+    (subpath (string-append (param "HOME") "/.npm"))
+    (subpath (string-append (param "HOME") "/.cache"))
+    (subpath (string-append (param "HOME") "/Library/Caches"))
+
+    ;; npx temp packages (for npx-based tools)
+    (subpath (string-append (param "HOME") "/.npm/_npx"))
+
+    ;; Devices and pseudo-terminals
+    (literal "/dev/stdout")
+    (literal "/dev/stderr")
+    (literal "/dev/null")
+    (literal "/dev/dtracehelper")
+    (literal "/dev/ptmx")
+    (regex #"^/dev/tty.*")
+    (regex #"^/dev/pty.*")
+)

@@ -1,0 +1,247 @@
+#!/usr/bin/env fish
+
+# claude-sandboxed - Launch Claude Code in a macOS sandbox-exec sandbox
+#
+# Uses Apple's Seatbelt (sandbox-exec) to restrict file writes.
+# MCP servers run on the host (outside sandbox) and are accessed via HTTP/SSE.
+
+# --- Preconditions ---
+for cmd in jq gum nc
+    if not command -q $cmd
+        echo "Error: $cmd is required but not installed" >&2
+        exit 1
+    end
+end
+
+if not command -q claude
+    echo "Error: claude is required but not installed" >&2
+    echo "Install via: https://claude.ai/install.sh" >&2
+    exit 1
+end
+
+# --- Configuration ---
+set -g script_dir (dirname (status filename))
+set -g sandbox_profile "$script_dir/cc-sandbox.sb"
+set -g host_mcp_config ".claude/cc-sandbox-host.mcp.json"
+set -g guest_mcp_config ".mcp.json"
+set -g generated_mcp_config false
+
+# --- Help ---
+function usage
+    echo '
+claude-sandboxed
+
+Launch Claude Code in a macOS sandbox-exec sandbox.
+
+Uses Apple\'s Seatbelt to restrict file writes to the working directory,
+~/.claude, and temp directories. MCP servers run outside the sandbox
+and are accessed via HTTP/SSE.
+
+USAGE:
+    claude-sandboxed [OPTIONS] [-- CLAUDE_ARGS…]
+
+OPTIONS:
+    --init-mcp      Create default MCP config file and exit
+    --help          Show this help
+
+EXAMPLES:
+    claude-sandboxed                   # Launch CC in current directory
+    claude-sandboxed -- --continue     # Resume previous conversation
+    claude-sandboxed --init-mcp        # Create MCP config
+
+REQUIRES:
+    - claude (https://claude.ai/install.sh)
+    - jq (https://jqlang.org/)
+    - gum (https://github.com/charmbracelet/gum)
+    - supergateway (https://github.com/supercorp-ai/supergateway, if using MCP)
+
+NOTE:
+    This sandbox approach works for Swift/Xcode projects because MCP servers
+    (like xcsift-mcp) run OUTSIDE the sandbox and can invoke xcodebuild freely.
+'
+end
+
+# --- Cleanup ---
+function cleanup
+    # Kill all supergateway processes we started
+    pkill -f "supergateway.*--port" 2>/dev/null
+
+    # Remove generated MCP config
+    if $generated_mcp_config; and test -f "$guest_mcp_config"
+        rm -f "$guest_mcp_config"
+    end
+end
+
+# --- Init MCP Config ---
+function init_mcp_config
+    if test -f "$host_mcp_config"
+        echo "MCP config already exists: $host_mcp_config"
+        exit 1
+    end
+
+    mkdir -p (dirname "$host_mcp_config")
+
+    # Start with xcsift-mcp
+    set -l config (jq -n '{
+        mcpServers: {
+            "xcsift-mcp": {
+                command: "xcsift-mcp",
+                args: [],
+                port: 8001
+            }
+        }
+    }')
+
+    # Add cupertino if installed
+    if command -q cupertino
+        set -l cupertino_path (command -s cupertino)
+        set config (echo "$config" | jq --arg cmd "$cupertino_path" \
+            '.mcpServers.cupertino = {command: $cmd, args: ["serve"], port: 8002}')
+    end
+
+    echo "$config" | jq . >"$host_mcp_config"
+
+    echo "Created $host_mcp_config"
+    echo "Edit this file to configure MCP servers, then run claude-sandboxed."
+end
+
+# --- Start MCP Servers ---
+function start_mcp_servers
+    if not test -f "$host_mcp_config"
+        return 0
+    end
+
+    if not command -q npx
+        echo "Error: npx is required for MCP servers but not installed" >&2
+        exit 1
+    end
+
+    echo "Starting MCP servers…"
+
+    # Read server configs
+    set -l servers (jq -r '.mcpServers | keys[]' "$host_mcp_config")
+
+    for server in $servers
+        set -l command (jq -r ".mcpServers[\"$server\"].command" "$host_mcp_config")
+        set -l args (jq -r ".mcpServers[\"$server\"].args | join(\" \")" "$host_mcp_config")
+        set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
+
+        # Read env vars as KEY=value pairs
+        set -l env_pairs (jq -r ".mcpServers[\"$server\"].env // {} | to_entries | .[] | \"\(.key)=\(.value)\"" "$host_mcp_config")
+
+        echo "  Starting $server on port $port…"
+
+        # Build the full command (handle empty args)
+        set -l full_command "$command"
+        if test -n "$args"
+            set full_command "$command $args"
+        end
+
+        # Start supergateway in background (log to temp file for debugging)
+        # Use env command to set environment variables if any are defined
+        set -l logfile "/tmp/supergateway-$server-"(random)".log"
+        if test (count $env_pairs) -gt 0
+            nohup env $env_pairs npx -y supergateway --stdio "$full_command" --port "$port" >"$logfile" 2>&1 &
+        else
+            nohup npx -y supergateway --stdio "$full_command" --port "$port" >"$logfile" 2>&1 &
+        end
+        disown
+
+        # Wait for port to be ready (up to 30 seconds) with spinner
+        if not gum spin --title "Waiting for $server…" -- fish -c "
+            for attempt in (seq 1 30)
+                if nc -z 127.0.0.1 $port 2>/dev/null
+                    exit 0
+                end
+                sleep 1
+            end
+            exit 1
+        "
+            echo "Error: supergateway for $server failed to start (port $port not listening after 30s)" >&2
+            echo "Log output:" >&2
+            cat "$logfile" >&2
+            cleanup
+            exit 1
+        end
+    end
+
+    # Generate guest MCP config (uses localhost since we're on the same machine)
+    echo "Generating MCP config…"
+
+    set -l guest_config (jq -n '{mcpServers: {}}')
+
+    for server in $servers
+        set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
+        set guest_config (echo "$guest_config" | jq \
+            --arg server "$server" \
+            --arg url "http://127.0.0.1:$port/sse" \
+            '.mcpServers[$server] = {type: "sse", url: $url}')
+    end
+
+    echo "$guest_config" | jq . >"$guest_mcp_config"
+    set generated_mcp_config true
+
+    echo "  Created $guest_mcp_config"
+end
+
+# --- Parse Arguments ---
+set -l claude_args
+
+set -l i 1
+while test $i -le (count $argv)
+    switch $argv[$i]
+        case --help
+            usage
+            exit 0
+        case --init-mcp
+            init_mcp_config
+            exit 0
+        case --
+            set i (math $i + 1)
+            set claude_args $argv[$i..-1]
+            break
+        case '-*'
+            echo "Error: Unknown option: $argv[$i]" >&2
+            usage
+            exit 1
+        case '*'
+            echo "Error: Unexpected argument: $argv[$i]" >&2
+            usage
+            exit 1
+    end
+    set i (math $i + 1)
+end
+
+# --- Validate sandbox profile ---
+if not test -f "$sandbox_profile"
+    echo "Error: Sandbox profile not found: $sandbox_profile" >&2
+    exit 1
+end
+
+# --- Main ---
+
+# Set up cleanup trap
+trap cleanup EXIT INT TERM
+
+# Start MCP servers if configured
+start_mcp_servers
+
+# Show what we're doing
+echo ""
+echo "Launching Claude Code in sandbox…"
+echo "  Workspace: "(pwd)" (r/w)"
+echo "  Config: ~/.claude (r/w)"
+echo "  Writes blocked: everywhere else"
+if test -f "$host_mcp_config"
+    echo "  MCP servers: "(jq -r '.mcpServers | keys | join(", ")' "$host_mcp_config")
+end
+echo ""
+
+# Run Claude in sandbox
+sandbox-exec \
+    -f "$sandbox_profile" \
+    -D "WORKDIR=$(pwd)" \
+    -D "HOME=$HOME" \
+    claude --dangerously-skip-permissions $claude_args
+
+# Cleanup happens via trap
