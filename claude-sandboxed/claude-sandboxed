@@ -26,6 +26,42 @@ set -g host_mcp_config ".claude/cc-sandbox-host.mcp.json"
 set -g guest_mcp_config ".mcp.json"
 set -g generated_mcp_config false
 
+# --- Parse Sandbox Profile ---
+# Extracts writable path categories from comments in the .sb file
+function get_writable_categories
+    set -l categories
+    set -l in_allow_block false
+
+    for line in (cat "$sandbox_profile")
+        # Detect start of (allow file-write* ...) block
+        if string match -q '*(allow file-write*' -- "$line"
+            set in_allow_block true
+            continue
+        end
+
+        if test "$in_allow_block" = true
+            # Detect end of block (closing paren at start of line)
+            if string match -qr '^\)' -- "$line"
+                break
+            end
+
+            # Extract category from comment lines (;; Category name)
+            if string match -qr '^[[:space:]]*;;' -- "$line"
+                set -l category (string replace -r '^[[:space:]]*;;[[:space:]]*' '' -- "$line")
+                # Remove parenthetical notes like "(full write access)"
+                set category (string replace -r '\s*\([^)]*\)$' '' -- "$category")
+                # Skip empty lines and device entries (not user-relevant)
+                if test -n "$category"; and not string match -qi '*device*' -- "$category"
+                    set -a categories "$category"
+                end
+            end
+        end
+    end
+
+    # Output lowercase, comma-separated
+    printf '%s\n' $categories | string lower | string join ', '
+end
+
 # --- Help ---
 function usage
     echo '
@@ -50,7 +86,7 @@ EXAMPLES:
     claude-sandboxed --init-mcp        # Create MCP config
 
 REQUIRES:
-    - claude (https://claude.ai/install.sh)
+    - claude (https://claude.ai/)
     - jq (https://jqlang.org/)
     - gum (https://github.com/charmbracelet/gum)
     - supergateway (https://github.com/supercorp-ai/supergateway, if using MCP)
@@ -229,9 +265,8 @@ start_mcp_servers
 # Show what we're doing
 echo ""
 echo "Launching Claude Code in sandbox…"
-echo "  Workspace: "(pwd)" (r/w)"
-echo "  Config: ~/.claude (r/w)"
-echo "  Writes blocked: everywhere else"
+echo "  Writable: "(get_writable_categories)
+echo "  Read-only: everywhere else"
 if test -f "$host_mcp_config"
     echo "  MCP servers: "(jq -r '.mcpServers | keys | join(", ")' "$host_mcp_config")
 end
