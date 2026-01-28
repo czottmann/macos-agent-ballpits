@@ -1,6 +1,10 @@
-# Claude Code Sandboxed
+# Ballpits
 
-Run Claude Code in a sandboxed environment with MCP server integration. Two approaches available:
+**Securing Claude Code and Agents on macOS**
+
+This is my personal take on sandboxing Claude Code and similar AI agents. I'm scratching my own itch here—restricting file write access so agents can only modify the current project and a few config directories. No guarantees, no claims of bulletproof security. I might be wrong about some of this. Use at your own risk.
+
+## Two Approaches
 
 | Approach | Isolation | Startup | Best For |
 |----------|-----------|---------|----------|
@@ -9,13 +13,13 @@ Run Claude Code in a sandboxed environment with MCP server integration. Two appr
 
 ## How It Works
 
-Both approaches share the same architecture:
+Both approaches share the same idea:
 
 1. **MCP servers run on the host** (outside the sandbox) via [supergateway](https://github.com/supercorp-ai/supergateway)
 2. **Claude runs inside the sandbox** with restricted write access
 3. **Claude connects to MCP servers** via HTTP/SSE
 
-This design lets tools like [xcsift-mcp](https://github.com/johnnyclem/xcsift-mcp) invoke `xcodebuild` freely—no nested sandbox issues.
+This lets tools like [xcsift-mcp](https://github.com/johnnyclem/xcsift-mcp) invoke `xcodebuild` freely—no nested sandbox issues.
 
 ## Quick Start
 
