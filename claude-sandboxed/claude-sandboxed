@@ -20,7 +20,7 @@ if not command -q claude
 end
 
 # --- Configuration ---
-set -g script_dir (dirname (status filename))
+set -g script_dir (dirname (realpath (status filename)))
 set -g sandbox_profile "$script_dir/cc-sandbox.sb"
 set -g host_mcp_config ".claude/cc-sandbox-host.mcp.json"
 set -g guest_mcp_config ".mcp.json"
