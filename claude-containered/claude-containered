@@ -39,6 +39,7 @@ EXAMPLES:
     claude-containered                          # Launch CC in current directory
     claude-containered -- pi                    # Launch pi in current directory
     claude-containered --ro ~/Documents         # With read-only ~/Documents
+    claude-containered --ro ~/.gitconfig        # With read-only file
     claude-containered -- --help                # Pass --help to claude
     claude-containered --init-mcp               # Create MCP config
 
@@ -293,8 +294,8 @@ end
 for ro_path in $ro_mounts
     # Expand path (handles ~ and env vars)
     set -l expanded_path (eval echo $ro_path)
-    if not test -d "$expanded_path"
-        echo "Error: $expanded_path is not a directory" >&2
+    if not test -e "$expanded_path"
+        echo "Error: $expanded_path does not exist" >&2
         cleanup
         exit 1
     end
