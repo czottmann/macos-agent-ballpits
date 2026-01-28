@@ -1,4 +1,4 @@
-# Claude Code Sandboxed Environment (OrbStack)
+# claude-containered
 
 Run Claude Code in a sandboxed Docker container via OrbStack with controlled filesystem access and MCP server integration.
 
@@ -21,22 +21,22 @@ Run Claude Code in a sandboxed Docker container via OrbStack with controlled fil
 
 ```fish
 # First run: builds the image automatically
-./cc-sandbox.fish
+./claude-containered
 
 # Run pre-installed pi-coding-agent instead of Claude Code
-./cc-sandbox.fish -- pi
+./claude-containered -- pi
 
 # With read-only access to additional directories
-./cc-sandbox.fish --ro ~/Documents --ro ~/Reference
+./claude-containered --ro ~/Documents --ro ~/Reference
 
 # Run a shell for manual exploration
-./cc-sandbox.fish -- bash
+./claude-containered -- bash
 ```
 
 ## Usage
 
 ```
-cc-sandbox [OPTIONS] [-- COMMAND...]
+claude-containered [OPTIONS] [-- COMMAND...]
 
 OPTIONS:
     --ro PATH       Add a read-only mount (can be repeated)
@@ -81,7 +81,7 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
 
 1. Create MCP config for the current project/folder (auto-detects installed servers):
    ```fish
-   ./cc-sandbox.fish --init-mcp
+   ./claude-containered --init-mcp
    ```
 
 2. This creates `.claude/cc-sandbox-host.mcp.json`:
@@ -104,7 +104,7 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
 
 3. Run the sandbox — MCP servers start automatically:
    ```fish
-   ./cc-sandbox.fish
+   ./claude-containered
    ```
 
 ### How It Works
@@ -146,17 +146,15 @@ The image is built automatically on first run. To rebuild manually:
 
 ```fish
 docker context use orbstack
-docker build -t cc-sandbox .
+docker build -t claude-containered .
 ```
 
 ## Files
 
 | File | Purpose |
 |------|---------|
+| `claude-containered` | Launcher script |
 | `Dockerfile` | Debian + Claude Code + pi + dev tools |
-| `cc-sandbox.fish` | Launcher script |
-| `.claude/cc-sandbox-host.mcp.json` | Host MCP server config (per-project) |
-| `.mcp.json` | Generated guest config (gitignore this) |
 
 ## Included Tools
 

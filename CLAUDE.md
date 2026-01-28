@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repository provides two approaches for running Claude Code in a sandboxed environment with MCP server integration:
 
-1. **OrbStack** (`cc-sandbox.fish`) — Docker-based sandbox via OrbStack
+1. **OrbStack** (`claude-containered/`) — Docker-based sandbox via OrbStack
 2. **sandbox-exec** (`claude-sandboxed/`) — Native macOS Seatbelt sandbox
 
 Both share the same MCP configuration format and use supergateway to bridge stdio-based MCP servers to HTTP/SSE.
@@ -32,8 +32,8 @@ Host machine:
 
 | File | Purpose |
 |------|---------|
-| `cc-sandbox.fish` | OrbStack launcher (fish shell) |
-| `Dockerfile` | Container image definition |
+| `claude-containered/claude-containered` | OrbStack launcher (fish shell) |
+| `claude-containered/Dockerfile` | Container image definition |
 | `claude-sandboxed/claude-sandboxed` | sandbox-exec launcher (fish shell) |
 | `claude-sandboxed/cc-sandbox.sb` | Seatbelt profile defining allowed writes |
 
@@ -62,7 +62,7 @@ No automated tests. Manual testing required:
 
 ```fish
 # Test OrbStack version
-./cc-sandbox.fish
+./claude-containered/claude-containered
 
 # Test sandbox-exec version (from a normal terminal, not inside Claude Code)
 ./claude-sandboxed/claude-sandboxed
@@ -74,5 +74,5 @@ No automated tests. Manual testing required:
 
 ```fish
 docker context use orbstack
-docker build -t cc-sandbox .
+docker build -t claude-containered ./claude-containered/
 ```

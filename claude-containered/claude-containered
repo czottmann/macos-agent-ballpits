@@ -1,6 +1,6 @@
 #!/usr/bin/env fish
 
-# cc-sandbox - Launch Claude Code in a sandboxed OrbStack container
+# claude-containered - Launch Claude Code in a sandboxed OrbStack container
 
 # --- Preconditions ---
 for cmd in docker jq gum
@@ -12,7 +12,7 @@ end
 
 # --- Configuration ---
 set -g script_dir (dirname (status filename))
-set -g image_name "cc-sandbox"
+set -g image_name "claude-containered"
 set -g host_mcp_config ".claude/cc-sandbox-host.mcp.json"
 set -g guest_mcp_config ".mcp.json"
 set -g supergateway_pids
@@ -22,12 +22,12 @@ set -g generated_mcp_config false
 # --- Help ---
 function usage
     echo '
-cc-sandbox
+claude-containered
 
 Launch Claude Code in a sandboxed OrbStack Docker container.
 
 USAGE:
-    cc-sandbox [OPTIONS] [-- CLAUDE_ARGS…]
+    claude-containered [OPTIONS] [-- CLAUDE_ARGS…]
 
 OPTIONS:
     --ro PATH       Add a read-only mount (can be repeated)
@@ -36,11 +36,11 @@ OPTIONS:
     --help          Show this help
 
 EXAMPLES:
-    cc-sandbox                          # Launch CC in current directory
-    cc-sandbox -- pi                    # Launch pi in current directory
-    cc-sandbox --ro ~/Documents         # With read-only ~/Documents
-    cc-sandbox -- --help                # Pass --help to claude
-    cc-sandbox --init-mcp               # Create MCP config
+    claude-containered                          # Launch CC in current directory
+    claude-containered -- pi                    # Launch pi in current directory
+    claude-containered --ro ~/Documents         # With read-only ~/Documents
+    claude-containered -- --help                # Pass --help to claude
+    claude-containered --init-mcp               # Create MCP config
 
 REQUIRES:
     - OrbStack running (https://orbstack.dev/, provides docker)
@@ -96,7 +96,7 @@ function init_mcp_config
     echo "$config" | jq . >"$host_mcp_config"
 
     echo "Created $host_mcp_config"
-    echo "Edit this file to configure MCP servers, then run cc-sandbox."
+    echo "Edit this file to configure MCP servers, then run claude-containered."
 end
 
 # --- Start MCP Servers ---
