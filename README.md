@@ -15,14 +15,6 @@ I want…
 
 Also, I want that thing to boot up in less than 5s.
 
-## Disclaimer
-
-I'm scratching my own itch here—restricting file write access so agents can only modify the current project and a few config directories. None of this is rocket science, but I was learning a few things, and sharing is caring.
-
-This is an opinionated setup! I love fish shell, I dig [gum](https://github.com/charmbracelet/gum). The upside is that the scripts are documented and rather easy to read and translate.
-
-No guarantees, no claims of bulletproof security. I might be wrong about some of this. Use at your own risk. Feel free to mix and match!
-
 ## Two Approaches
 
 I've settled on two different approaches, and work with them 
@@ -41,6 +33,14 @@ Both approaches share the same idea:
 3. **Claude connects to MCP servers** via HTTP/SSE
 
 This lets tools like [xcsift-mcp](https://github.com/johnnyclem/xcsift-mcp) invoke `xcodebuild` freely—no nested sandbox issues. (Side note: Big Swift dev shoutout to [xcsift](https://github.com/ldomaradzki/xcsift)!)
+
+## Disclaimer
+
+I'm scratching my own itch here—restricting file write access so agents can only modify the current project and a few config directories. None of this is rocket science, but I was learning a few things, and sharing is caring.
+
+This is an opinionated setup! I love fish shell, I dig [gum](https://github.com/charmbracelet/gum). The upside is that the scripts are documented and rather easy to read and translate.
+
+No guarantees, no claims of bulletproof security. I might be wrong about some of this. Use at your own risk. Feel free to mix and match!
 
 ## Quick Start
 
