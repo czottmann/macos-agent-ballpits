@@ -75,10 +75,17 @@ function init_mcp_config
 
     mkdir -p (dirname "$host_mcp_config")
 
-    # Start with xcodebuildmcp
+    # Start with xcodebuildmcp (including env var example)
     set -l config (jq -n '{
         mcpServers: {
-            xcodebuildmcp: {command: "npx", args: ["-y", "xcodebuildmcp"], port: 8001}
+            xcodebuildmcp: {
+                command: "npx",
+                args: ["-y", "xcodebuildmcp@latest"],
+                port: 8001,
+                env: {
+                    XCODEBUILDMCP_CLAUDE_CODE_WORKAROUND: "true"
+                }
+            }
         }
     }')
 
@@ -116,6 +123,9 @@ function start_mcp_servers
         set -l args (jq -r ".mcpServers[\"$server\"].args | join(\" \")" "$host_mcp_config")
         set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
 
+        # Read env vars as KEY=value pairs
+        set -l env_pairs (jq -r ".mcpServers[\"$server\"].env // {} | to_entries | .[] | \"\(.key)=\(.value)\"" "$host_mcp_config")
+
         echo "  Starting $server on port $port…"
 
         # Build the full command (handle empty args)
@@ -125,8 +135,13 @@ function start_mcp_servers
         end
 
         # Start supergateway in background (log to temp file for debugging)
+        # Use env command to set environment variables if any are defined
         set -l logfile "/tmp/supergateway-$server-"(random)".log"
-        nohup npx -y supergateway --stdio "$full_command" --port "$port" >"$logfile" 2>&1 &
+        if test (count $env_pairs) -gt 0
+            nohup env $env_pairs npx -y supergateway --stdio "$full_command" --port "$port" >"$logfile" 2>&1 &
+        else
+            nohup npx -y supergateway --stdio "$full_command" --port "$port" >"$logfile" 2>&1 &
+        end
         disown
         set -l pid $last_pid
         set -a supergateway_pids $pid
@@ -258,6 +273,10 @@ end
 # Mount workspace (mirror full host path)
 set -a docker_args -v (pwd):(pwd)
 set -a docker_args -w (pwd)
+
+# Mount git files
+set -a docker_args -v "$HOME/.gitconfig:/home/claude/.gitconfig"
+set -a docker_args -v "$HOME/.git-credentials:/home/claude/.git-credentials"
 
 # Mount host Claude config (for auth and settings)
 set -a docker_args -v "$HOME/.claude:/home/claude/.claude"

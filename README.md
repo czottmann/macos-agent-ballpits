@@ -90,8 +90,11 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
      "mcpServers": {
        "xcodebuildmcp": {
          "command": "npx",
-         "args": ["-y", "xcodebuildmcp"],
-         "port": 8001
+         "args": ["-y", "xcodebuildmcp@latest"],
+         "port": 8001,
+         "env": {
+           "XCODEBUILDMCP_CLAUDE_CODE_WORKAROUND": "true"
+         }
        },
        "cupertino": {
          "command": "/opt/homebrew/bin/cupertino",
@@ -125,11 +128,20 @@ Edit `<project-root>/.claude/cc-sandbox-host.mcp.json`:
     "my-server": {
       "command": "/path/to/server",
       "args": ["--some-flag"],
-      "port": 8003
+      "port": 8003,
+      "env": {
+        "MY_VAR": "value"
+      }
     }
   }
 }
 ```
+
+Config fields:
+- `command`: The executable to run
+- `args`: Arguments (array)
+- `port`: Port for supergateway to expose
+- `env`: Environment variables (optional)
 
 ## Building the Image
 
