@@ -174,7 +174,7 @@ function start_mcp_servers
             '.mcpServers[$server] = {type: "sse", url: $url}')
     end
 
-    echo "$guest_config" >"$guest_mcp_config"
+    echo "$guest_config" | jq . >"$guest_mcp_config"
     set generated_mcp_config true
 
     echo "  Created $guest_mcp_config"
