@@ -32,9 +32,6 @@
     (subpath (string-append (param "HOME") "/.cache"))
     (subpath (string-append (param "HOME") "/Library/Caches"))
 
-    ;; npx temp packages (for npx-based tools)
-    (subpath (string-append (param "HOME") "/.npm/_npx"))
-
     ;; Devices and pseudo-terminals
     (literal "/dev/stdout")
     (literal "/dev/stderr")
