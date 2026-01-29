@@ -341,8 +341,8 @@ end
 
 # Mount read-only directories (mirror full host path, like workspace)
 for ro_path in $ro_mounts
-    # Expand path (handles ~ and env vars)
-    set -l expanded_path (eval echo $ro_path)
+    # Expand ~ to $HOME
+    set -l expanded_path (path normalize "$ro_path")
     if not test -e "$expanded_path"
         echo "Error: $expanded_path does not exist" >&2
         cleanup
