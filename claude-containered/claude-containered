@@ -317,9 +317,13 @@ end
 set -a docker_args -v (pwd):(pwd)
 set -a docker_args -w (pwd)
 
-# Mount git files
-set -a docker_args -v "$HOME/.gitconfig:/home/claude/.gitconfig"
-set -a docker_args -v "$HOME/.git-credentials:/home/claude/.git-credentials"
+# Mount git files (only if they exist)
+if test -f "$HOME/.gitconfig"
+    set -a docker_args -v "$HOME/.gitconfig:/home/claude/.gitconfig"
+end
+if test -f "$HOME/.git-credentials"
+    set -a docker_args -v "$HOME/.git-credentials:/home/claude/.git-credentials"
+end
 
 # Mount host Claude config (for auth and settings)
 set -a docker_args -v "$HOME/.claude:/home/claude/.claude"
