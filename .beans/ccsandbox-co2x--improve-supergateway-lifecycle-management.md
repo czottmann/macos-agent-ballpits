@@ -1,10 +1,11 @@
 ---
 # ccsandbox-co2x
 title: Improve supergateway lifecycle management
-status: todo
+status: completed
 type: epic
+priority: normal
 created_at: 2026-01-29T12:18:46Z
-updated_at: 2026-01-29T12:18:46Z
+updated_at: 2026-01-29T12:23:47Z
 ---
 
 Improve how both sandbox launchers manage supergateway processes, covering port assignment and process cleanup.

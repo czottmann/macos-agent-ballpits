@@ -1,11 +1,11 @@
 ---
 # ccsandbox-kcqa
 title: Use PID-based cleanup for supergateway processes
-status: todo
+status: completed
 type: bug
 priority: normal
 created_at: 2026-01-29T12:18:54Z
-updated_at: 2026-01-29T12:18:57Z
+updated_at: 2026-01-29T12:21:40Z
 parent: ccsandbox-co2x
 ---
 
@@ -29,3 +29,8 @@ end
 **Affected files:**
 - claude-containered/claude-containered
 - claude-sandboxed/claude-sandboxed
+
+## Summary of Changes
+
+- **claude-containered**: Updated `cleanup` function to iterate over `supergateway_pids` instead of using `pkill` pattern matching (the variable was already being populated)
+- **claude-sandboxed**: Added `supergateway_pids` global variable, added PID collection after `disown`, updated `cleanup` to use PID-based termination

@@ -18,6 +18,8 @@ set -g guest_mcp_config ".mcp.json"
 set -g supergateway_pids
 set -g original_context ""
 set -g generated_mcp_config false
+set -g assigned_ports  # Tracks ports assigned during this session
+set -g server_ports    # Parallel array: server_ports[i] is the port for servers[i]
 
 # --- Help ---
 function usage
@@ -53,8 +55,10 @@ end
 
 # --- Cleanup ---
 function cleanup
-    # Kill all supergateway processes we started
-    pkill -f "supergateway.*--port" 2>/dev/null
+    # Kill supergateway processes we started (by PID, not pattern)
+    for pid in $supergateway_pids
+        kill $pid 2>/dev/null
+    end
 
     # Restore docker context
     if test -n "$original_context"
@@ -65,6 +69,30 @@ function cleanup
     if $generated_mcp_config; and test -f "$guest_mcp_config"
         rm -f "$guest_mcp_config"
     end
+end
+
+# --- Port Management ---
+function find_available_port
+    set -l start_port 8001
+    set -l port $start_port
+
+    while test $port -lt 9000
+        # Skip if already assigned this session
+        if contains $port $assigned_ports
+            set port (math $port + 1)
+            continue
+        end
+
+        # Check if port is available
+        if not nc -z 127.0.0.1 $port 2>/dev/null
+            echo $port
+            return 0
+        end
+
+        set port (math $port + 1)
+    end
+
+    return 1
 end
 
 # --- Init MCP Config ---
@@ -119,10 +147,25 @@ function start_mcp_servers
     for server in $servers
         set -l command (jq -r ".mcpServers[\"$server\"].command" "$host_mcp_config")
         set -l args (jq -r ".mcpServers[\"$server\"].args | join(\" \")" "$host_mcp_config")
-        set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
+        set -l config_port (jq -r ".mcpServers[\"$server\"].port // empty" "$host_mcp_config")
 
         # Read env vars as KEY=value pairs
         set -l env_pairs (jq -r ".mcpServers[\"$server\"].env // {} | to_entries | .[] | \"\(.key)=\(.value)\"" "$host_mcp_config")
+
+        # Use configured port or auto-assign
+        set -l port
+        if test -n "$config_port"
+            set port $config_port
+        else
+            set port (find_available_port)
+            if test -z "$port"
+                echo "Error: No available ports for $server" >&2
+                cleanup
+                exit 1
+            end
+        end
+        set -a assigned_ports $port
+        set -a server_ports $port
 
         echo "  Starting $server on port $port…"
 
@@ -162,17 +205,19 @@ function start_mcp_servers
         end
     end
 
-    # Generate guest MCP config
+    # Generate guest MCP config (using ports assigned above)
     echo "Generating guest MCP config…"
 
     set -l guest_config (jq -n '{mcpServers: {}}')
 
+    set -l i 1
     for server in $servers
-        set -l port (jq -r ".mcpServers[\"$server\"].port" "$host_mcp_config")
+        set -l port $server_ports[$i]
         set guest_config (echo "$guest_config" | jq \
             --arg server "$server" \
             --arg url "http://host.internal:$port/sse" \
             '.mcpServers[$server] = {type: "sse", url: $url}')
+        set i (math $i + 1)
     end
 
     echo "$guest_config" | jq . >"$guest_mcp_config"
