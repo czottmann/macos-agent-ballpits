@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     fd-find \
     gnupg \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 22 from NodeSource (Debian's v18 is too old for pi-coding-agent)
@@ -35,7 +36,15 @@ RUN ln -s /usr/bin/fdfind /usr/bin/fd
 # Create claude user with bash as default shell
 RUN useradd -m -s /bin/bash claude
 
-# Install Claude Code, beans, and pi-coding-agent as the claude user
+# Install SwiftFormat (pre-built ARM64 binary)
+RUN curl -fsSL https://github.com/nicklockwood/SwiftFormat/releases/latest/download/swiftformat_linux_aarch64.zip \
+    -o /tmp/swiftformat.zip \
+    && unzip -q /tmp/swiftformat.zip -d /tmp \
+    && mv /tmp/swiftformat_linux_aarch64 /usr/local/bin/swiftformat \
+    && chmod +x /usr/local/bin/swiftformat \
+    && rm /tmp/swiftformat.zip
+
+# Install Claude Code, beans, pi-coding-agent, and Deno as the claude user
 USER claude
 WORKDIR /home/claude
 RUN curl -fsSL https://claude.ai/install.sh | bash
@@ -43,8 +52,11 @@ RUN go install github.com/hmans/beans@latest
 RUN mkdir -p /home/claude/.npm-global && npm config set prefix /home/claude/.npm-global
 RUN npm install -g @mariozechner/pi-coding-agent
 
-# Ensure claude's local bin, Go bin, and npm global bin are in PATH
-ENV PATH="/home/claude/.local/bin:/home/claude/go/bin:/home/claude/.npm-global/bin:${PATH}"
+# Install Deno
+RUN curl -fsSL https://deno.land/install.sh | sh
+
+# Ensure claude's local bin, Go bin, npm global bin, and Deno bin are in PATH
+ENV PATH="/home/claude/.local/bin:/home/claude/go/bin:/home/claude/.npm-global/bin:/home/claude/.deno/bin:${PATH}"
 
 WORKDIR /workspace
 CMD ["claude"]
