@@ -5,9 +5,10 @@ A lightweight alternative to the OrbStack-based sandbox that uses macOS's native
 ## How It Works
 
 1. MCP servers start on the host (outside sandbox) via supergateway
-2. Claude runs inside `sandbox-exec` with restricted write permissions
-3. Claude connects to MCP servers via HTTP/SSE on localhost
-4. On exit, MCP servers are cleaned up
+2. Generates `.mcp.json` with SSE URLs (**NOTE: prompts before overwriting existing file**)
+3. Claude runs inside `sandbox-exec` with restricted write permissions
+4. Claude connects to MCP servers via HTTP/SSE on localhost
+5. On exit, MCP servers are cleaned up and generated `.mcp.json` is removed
 
 Since MCP servers run **outside** the sandbox, tools like `xcsift-mcp` can invoke `xcodebuild` and SPM freely—no nested sandbox issues.
 

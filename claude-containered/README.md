@@ -111,7 +111,7 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
 
 1. Launcher reads `.claude/cc-sandbox-host.mcp.json`
 2. Starts a supergateway instance for each MCP server (bridges stdio to SSE)
-3. Generates `.mcp.json` with SSE URLs for the container (**NOTE: this overwrites any existing file!**)
+3. Generates `.mcp.json` with SSE URLs for the container (**NOTE: prompts before overwriting existing file**)
 4. Claude Code inside container connects to MCP servers via `http://host.internal:<port>/sse`
 5. On exit, supergateway processes are killed automatically
 
