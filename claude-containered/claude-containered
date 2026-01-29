@@ -139,6 +139,14 @@ function start_mcp_servers
         exit 1
     end
 
+    # Check for existing .mcp.json before we overwrite it
+    if test -f "$guest_mcp_config"
+        if not gum confirm "Overwrite existing $guest_mcp_config?"
+            echo "Aborted. Remove or rename $guest_mcp_config to continue." >&2
+            exit 1
+        end
+    end
+
     echo "Starting MCP servers…"
 
     # Read server configs
