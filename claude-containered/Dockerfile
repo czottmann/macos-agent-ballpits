@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     curl \
     ca-certificates \
+    fish \
     git \
     jq \
     ripgrep \
@@ -52,6 +53,7 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 RUN go install github.com/hmans/beans@latest
 RUN mkdir -p /home/claude/.npm-global && npm config set prefix /home/claude/.npm-global
 RUN npm install -g @mariozechner/pi-coding-agent
+RUN npm install -g github:czottmann/kagi-ken-cli
 
 # Install Deno
 RUN curl -fsSL https://deno.land/install.sh | sh
