@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     fd-find \
     gnupg \
+    sqlite3 \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
