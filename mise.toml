@@ -1,0 +1,6 @@
+[tasks.build-container]
+description = "Build the claude-containered Docker image"
+run = """
+docker context use orbstack
+docker build --build-arg USERNAME=$(whoami) -t claude-containered ./claude-containered/
+"""

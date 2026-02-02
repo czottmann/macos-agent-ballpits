@@ -51,11 +51,12 @@ COMMAND:
 
 ## Persistent Config
 
-The launcher mounts your host configuration:
+The launcher mounts your host configuration (container paths use your host username):
 
-- `~/.claude` → `/home/claude/.claude` (project data, settings)
-- `~/.claude-sandbox.json` → `/home/claude/.claude.json` (sandbox-specific auth)
-- `~/.pi` → `/home/claude/.pi` (pi-coding-agent config, if present)
+- `~/.claude` → `/home/<username>/.claude` (project data, settings)
+- `~/.claude-sandbox.json` → `/home/<username>/.claude.json` (sandbox-specific auth)
+- `~/.pi` → `/home/<username>/.pi` (pi-coding-agent config, if present)
+- `~/.kimi` → `/home/<username>/.kimi` (kimi-cli config, if present)
 
 This means:
 - You authenticate once and it persists across sessions
@@ -142,11 +143,10 @@ Config fields:
 
 ## Building the Image
 
-The image is built automatically on first run. To rebuild manually:
+The image is built automatically on first run with your host username baked in via `--build-arg USERNAME=$(whoami)`. To rebuild manually:
 
 ```fish
-docker context use orbstack
-docker build -t claude-containered .
+mise run build-container
 ```
 
 ## Files

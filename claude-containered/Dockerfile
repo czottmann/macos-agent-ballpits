@@ -1,8 +1,11 @@
 # Claude Code Sandboxed Environment for OrbStack
-# Build: docker build -t cc-sandbox .
-# Run: docker run --rm -it -v $(pwd):/workspace cc-sandbox
+# Build: docker build --build-arg USERNAME=$(whoami) -t claude-containered .
+# Run: docker run --rm -it -v $(pwd):/workspace claude-containered
 
 FROM debian:bookworm-slim
+
+# Build argument for username (defaults to czottmann)
+ARG USERNAME=czottmann
 
 # Install required packages (without nodejs - we'll install newer version)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,8 +38,8 @@ RUN curl -fsSL https://github.com/chmln/sd/releases/download/v1.0.0/sd-v1.0.0-aa
 # Create symlink for fd (Debian names it fdfind)
 RUN ln -s /usr/bin/fdfind /usr/bin/fd
 
-# Create czottmann user with bash as default shell
-RUN useradd -m -s /bin/bash czottmann
+# Create user with bash as default shell
+RUN useradd -m -s /bin/bash $USERNAME
 
 # Install SwiftFormat (pre-built ARM64 binary)
 RUN curl -fsSL https://github.com/nicklockwood/SwiftFormat/releases/latest/download/swiftformat_linux_aarch64.zip \
@@ -46,14 +49,14 @@ RUN curl -fsSL https://github.com/nicklockwood/SwiftFormat/releases/latest/downl
     && chmod +x /usr/local/bin/swiftformat \
     && rm /tmp/swiftformat.zip
 
-# Install Claude Code, beans, pi-coding-agent, and Deno as the claude user
-USER czottmann
-WORKDIR /home/czottmann
-RUN mkdir -p /home/czottmann/.npm-global && npm config set prefix /home/czottmann/.npm-global
+# Install Claude Code, beans, pi-coding-agent, and Deno as the user
+USER $USERNAME
+WORKDIR /home/$USERNAME
+RUN mkdir -p /home/$USERNAME/.npm-global && npm config set prefix /home/$USERNAME/.npm-global
 RUN curl -fsSL https://deno.land/install.sh | sh
 
-# Ensure claude's local bin, Go bin, npm global bin, and Deno bin are in PATH
-ENV PATH="/home/czottmann/.local/bin:/home/czottmann/go/bin:/home/czottmann/.npm-global/bin:/home/czottmann/.deno/bin:${PATH}"
+# Ensure user's local bin, Go bin, npm global bin, and Deno bin are in PATH
+ENV PATH="/home/$USERNAME/.local/bin:/home/$USERNAME/go/bin:/home/$USERNAME/.npm-global/bin:/home/$USERNAME/.deno/bin:${PATH}"
 
 RUN curl -fsSL https://code.kimi.com/install.sh | bash
 RUN curl -fsSL https://claude.ai/install.sh | bash

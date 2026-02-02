@@ -36,6 +36,7 @@ Host machine:
 | `claude-containered/Dockerfile` | Container image definition |
 | `claude-sandboxed/claude-sandboxed` | sandbox-exec launcher (fish shell) |
 | `claude-sandboxed/cc-sandbox.sb` | Seatbelt profile defining allowed writes |
+| `mise.toml` | Task runner configuration |
 
 ## MCP Config Format
 
@@ -73,6 +74,7 @@ No automated tests. Manual testing required:
 ## Rebuild Docker Image
 
 ```fish
-docker context use orbstack
-docker build -t claude-containered ./claude-containered/
+mise run build-container
 ```
+
+The image is built with the current host username via `--build-arg USERNAME=$(whoami)`. The container user and home directory paths match your macOS username.

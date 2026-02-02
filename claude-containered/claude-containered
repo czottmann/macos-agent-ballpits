@@ -15,6 +15,8 @@ set -g script_dir (dirname (realpath (status filename)))
 set -g image_name "claude-containered"
 set -g host_mcp_config ".claude/cc-sandbox-host.mcp.json"
 set -g guest_mcp_config ".mcp.json"
+set -g guest_username (whoami)
+set -g guest_home_folder "/home/$guest_username"
 set -g supergateway_pids
 set -g original_context ""
 set -g generated_mcp_config false
@@ -238,7 +240,7 @@ end
 function ensure_image
     if not docker image inspect "$image_name" >/dev/null 2>&1
         echo "Building $image_name image…"
-        docker build -t "$image_name" "$script_dir"
+        docker build --build-arg USERNAME="$guest_username" -t "$image_name" "$script_dir"
         or begin
             echo "Error: Failed to build image" >&2
             exit 1
@@ -327,29 +329,29 @@ set -a docker_args -w (pwd)
 
 # Mount git files (only if they exist)
 if test -f "$HOME/.gitconfig"
-    set -a docker_args -v "$HOME/.gitconfig:/home/claude/.gitconfig"
+    set -a docker_args -v "$HOME/.gitconfig:$guest_home_folder/.gitconfig"
 end
 if test -f "$HOME/.git-credentials"
-    set -a docker_args -v "$HOME/.git-credentials:/home/claude/.git-credentials"
+    set -a docker_args -v "$HOME/.git-credentials:$guest_home_folder/.git-credentials"
 end
 
 # Mount host Claude config (for auth and settings)
-set -a docker_args -v "$HOME/.claude:/home/claude/.claude"
+set -a docker_args -v "$HOME/.claude:$guest_home_folder/.claude"
 
 # Mount sandbox-specific claude.json (create if missing to avoid Docker creating a directory)
 if not test -f "$HOME/.claude-sandbox.json"
     echo '{}' > "$HOME/.claude-sandbox.json"
 end
-set -a docker_args -v "$HOME/.claude-sandbox.json:/home/claude/.claude.json"
+set -a docker_args -v "$HOME/.claude-sandbox.json:$guest_home_folder/.claude.json"
 
 # Mount host pi-coding-agent config
 if test -d "$HOME/.pi"
-    set -a docker_args -v "$HOME/.pi:/home/claude/.pi"
+    set -a docker_args -v "$HOME/.pi:$guest_home_folder/.pi"
 end
 
 # Mount host kimi-cli config
 if test -d "$HOME/.kimi"
-    set -a docker_args -v "$HOME/.kimi:/home/claude/.kimi"
+    set -a docker_args -v "$HOME/.kimi:$guest_home_folder/.kimi"
 end
 
 # Mount read-only directories (mirror full host path, like workspace)
@@ -379,13 +381,13 @@ end
 echo ""
 echo "Launching agents sandbox…"
 echo "  Workspace: "(pwd)" (r/w)"
-echo "  Config: ~/.claude -> /home/claude/.claude (r/w)"
-echo "  Config: ~/.claude-sandbox.json -> /home/claude/.claude.json (r/w)"
+echo "  Config: ~/.claude -> $guest_home_folder/.claude (r/w)"
+echo "  Config: ~/.claude-sandbox.json -> $guest_home_folder/.claude.json (r/w)"
 if test -d "$HOME/.kimi"
-    echo "  Config: ~/.kimi -> /home/claude/.kimi (r/w)"
+    echo "  Config: ~/.kimi -> $guest_home_folder/.kimi (r/w)"
 end
 if test -d "$HOME/.pi"
-    echo "  Config: ~/.pi -> /home/claude/.pi (r/w)"
+    echo "  Config: ~/.pi -> $guest_home_folder/.pi (r/w)"
 end
 if test (count $ro_mounts) -gt 0
     for ro_path in $ro_mounts
