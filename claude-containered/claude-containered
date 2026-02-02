@@ -347,6 +347,11 @@ if test -d "$HOME/.pi"
     set -a docker_args -v "$HOME/.pi:/home/claude/.pi"
 end
 
+# Mount host kimi-cli config
+if test -d "$HOME/.kimi"
+    set -a docker_args -v "$HOME/.kimi:/home/claude/.kimi"
+end
+
 # Mount read-only directories (mirror full host path, like workspace)
 for ro_path in $ro_mounts
     # Expand ~ to $HOME
@@ -376,6 +381,9 @@ echo "Launching agents sandbox…"
 echo "  Workspace: "(pwd)" (r/w)"
 echo "  Config: ~/.claude -> /home/claude/.claude (r/w)"
 echo "  Config: ~/.claude-sandbox.json -> /home/claude/.claude.json (r/w)"
+if test -d "$HOME/.kimi"
+    echo "  Config: ~/.kimi -> /home/claude/.kimi (r/w)"
+end
 if test -d "$HOME/.pi"
     echo "  Config: ~/.pi -> /home/claude/.pi (r/w)"
 end
