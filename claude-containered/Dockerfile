@@ -35,8 +35,8 @@ RUN curl -fsSL https://github.com/chmln/sd/releases/download/v1.0.0/sd-v1.0.0-aa
 # Create symlink for fd (Debian names it fdfind)
 RUN ln -s /usr/bin/fdfind /usr/bin/fd
 
-# Create claude user with bash as default shell
-RUN useradd -m -s /bin/bash claude
+# Create czottmann user with bash as default shell
+RUN useradd -m -s /bin/bash czottmann
 
 # Install SwiftFormat (pre-built ARM64 binary)
 RUN curl -fsSL https://github.com/nicklockwood/SwiftFormat/releases/latest/download/swiftformat_linux_aarch64.zip \
@@ -47,19 +47,19 @@ RUN curl -fsSL https://github.com/nicklockwood/SwiftFormat/releases/latest/downl
     && rm /tmp/swiftformat.zip
 
 # Install Claude Code, beans, pi-coding-agent, and Deno as the claude user
-USER claude
-WORKDIR /home/claude
-RUN curl -fsSL https://claude.ai/install.sh | bash
-RUN go install github.com/hmans/beans@latest
-RUN mkdir -p /home/claude/.npm-global && npm config set prefix /home/claude/.npm-global
-RUN npm install -g @mariozechner/pi-coding-agent
-RUN npm install -g github:czottmann/kagi-ken-cli
-
-# Install Deno
+USER czottmann
+WORKDIR /home/czottmann
+RUN mkdir -p /home/czottmann/.npm-global && npm config set prefix /home/czottmann/.npm-global
 RUN curl -fsSL https://deno.land/install.sh | sh
 
 # Ensure claude's local bin, Go bin, npm global bin, and Deno bin are in PATH
-ENV PATH="/home/claude/.local/bin:/home/claude/go/bin:/home/claude/.npm-global/bin:/home/claude/.deno/bin:${PATH}"
+ENV PATH="/home/czottmann/.local/bin:/home/czottmann/go/bin:/home/czottmann/.npm-global/bin:/home/czottmann/.deno/bin:${PATH}"
+
+RUN curl -fsSL https://code.kimi.com/install.sh | bash
+RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN npm install -g @mariozechner/pi-coding-agent
+RUN go install github.com/hmans/beans@latest
+RUN npm install -g github:czottmann/kagi-ken-cli
 
 WORKDIR /workspace
 CMD ["claude"]
