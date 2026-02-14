@@ -28,7 +28,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go from official source (Debian's version is too old for beans)
-RUN curl -fsSL https://go.dev/dl/go1.24.2.linux-arm64.tar.gz | tar -xz -C /usr/local
+RUN curl -fsSL https://go.dev/dl/go1.24.13.linux-arm64.tar.gz | tar -xz -C /usr/local
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install sd (not in Debian repos, download pre-built binary)
@@ -58,11 +58,10 @@ RUN curl -fsSL https://deno.land/install.sh | sh
 # Ensure user's local bin, Go bin, npm global bin, and Deno bin are in PATH
 ENV PATH="/home/$USERNAME/.local/bin:/home/$USERNAME/go/bin:/home/$USERNAME/.npm-global/bin:/home/$USERNAME/.deno/bin:${PATH}"
 
-RUN curl -fsSL https://code.kimi.com/install.sh | bash
 RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN claude update
 RUN npm install -g @mariozechner/pi-coding-agent
 RUN go install github.com/hmans/beans@latest
-RUN npm install -g github:czottmann/kagi-ken-cli
 
 WORKDIR /workspace
 CMD ["claude"]

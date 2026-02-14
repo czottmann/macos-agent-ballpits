@@ -56,7 +56,6 @@ The launcher mounts your host configuration (container paths use your host usern
 - `~/.claude` → `/home/<username>/.claude` (project data, settings)
 - `~/.claude-sandbox.json` → `/home/<username>/.claude.json` (sandbox-specific auth)
 - `~/.pi` → `/home/<username>/.pi` (pi-coding-agent config, if present)
-- `~/.kimi` → `/home/<username>/.kimi` (kimi-cli config, if present)
 
 This means:
 - You authenticate once and it persists across sessions
