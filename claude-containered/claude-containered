@@ -13,7 +13,7 @@ end
 # --- Configuration ---
 set -g script_dir (dirname (realpath (status filename)))
 set -g image_name "claude-containered"
-set -g host_mcp_config ".claude/cc-sandbox-host.mcp.json"
+set -g host_mcp_config ""
 set -g guest_mcp_config ".mcp.json"
 set -g guest_username (whoami)
 set -g guest_home_folder "/home/$guest_username"
@@ -30,22 +30,33 @@ claude-containered
 
 Launch Claude Code in a sandboxed OrbStack Docker container.
 
+Runs Claude Code (with --dangerously-skip-permissions) inside a Docker
+container managed by OrbStack. The current directory is mounted as the
+workspace. MCP servers defined in the --mcp-config JSON file are started
+on the host and bridged into the container via supergateway
+(stdio → HTTP/SSE), so tools like xcodebuild work without nested
+sandbox issues.
+
 USAGE:
     claude-containered [OPTIONS] [-- CLAUDE_ARGS…]
 
 OPTIONS:
+    --mcp-config PATH  Path to MCP server config JSON file
+
+    --workdir PATH  Set container working directory (relative to pwd)
     --ro PATH       Add a read-only mount (can be repeated)
     --keep          Keep the container after exit (don'\''t use --rm)
-    --init-mcp      Create default MCP config file and exit
+    --init-mcp      Create default MCP config at --mcp-config path and exit
     --help          Show this help
 
 EXAMPLES:
-    claude-containered                          # Launch CC in current directory
-    claude-containered -- pi                    # Launch pi in current directory
-    claude-containered --ro ~/Documents         # With read-only ~/Documents
-    claude-containered --ro ~/.gitconfig        # With read-only file
-    claude-containered -- --help                # Pass --help to claude
-    claude-containered --init-mcp               # Create MCP config
+    claude-containered
+    claude-containered --mcp-config .claude/mcp-host.json
+    claude-containered --mcp-config ~/mcp.json -- pi
+    claude-containered --mcp-config .claude/mcp-host.json --ro ~/Documents
+    claude-containered --mcp-config .claude/mcp-host.json -- --help
+    claude-containered --mcp-config .claude/mcp-host.json --init-mcp
+    claude-containered --mcp-config .claude/mcp-host.json --workdir .worktrees/x
 
 REQUIRES:
     - OrbStack running (https://orbstack.dev/, provides docker)
@@ -58,19 +69,25 @@ end
 # --- Cleanup ---
 function cleanup
     # Kill supergateway processes we started (by PID, not pattern)
+    echo "Stopping MCP servers…"
     for pid in $supergateway_pids
         kill $pid 2>/dev/null
     end
 
     # Restore docker context
     if test -n "$original_context"
+        echo "Restoring original docker context ($original_context)…"
         docker context use "$original_context" >/dev/null 2>&1
     end
 
     # Remove generated MCP config
     if $generated_mcp_config; and test -f "$guest_mcp_config"
+        set -l short_path (echo $guest_mcp_config | string replace (pwd) '.')
+        echo "Removing guest's MCP config ($short_path)…"
         rm -f "$guest_mcp_config"
     end
+
+    echo "…DONE. Bye!"
 end
 
 # --- Port Management ---
@@ -132,10 +149,6 @@ end
 
 # --- Start MCP Servers ---
 function start_mcp_servers
-    if not test -f "$host_mcp_config"
-        return 0
-    end
-
     if not command -q npx
         echo "Error: npx is required for MCP servers but not installed" >&2
         exit 1
@@ -251,7 +264,9 @@ end
 # --- Parse Arguments ---
 set -l ro_mounts
 set -l keep_container false
+set -l workdir ""
 set -l claude_args
+set -l do_init_mcp false
 
 set -l i 1
 while test $i -le (count $argv)
@@ -259,9 +274,26 @@ while test $i -le (count $argv)
         case --help
             usage
             exit 0
+
+        case --mcp-config
+            set i (math $i + 1)
+            if test $i -gt (count $argv)
+                echo "Error: --mcp-config requires a path argument" >&2
+                exit 1
+            end
+            set host_mcp_config $argv[$i]
+
         case --init-mcp
-            init_mcp_config
-            exit 0
+            set do_init_mcp true
+
+        case --workdir
+            set i (math $i + 1)
+            if test $i -gt (count $argv)
+                echo "Error: --workdir requires a path argument" >&2
+                exit 1
+            end
+            set workdir $argv[$i]
+
         case --ro
             set i (math $i + 1)
             if test $i -gt (count $argv)
@@ -269,22 +301,43 @@ while test $i -le (count $argv)
                 exit 1
             end
             set -a ro_mounts $argv[$i]
+
         case --keep
             set keep_container true
+
         case --
             set i (math $i + 1)
             set claude_args $argv[$i..-1]
             break
+
         case '-*'
             echo "Error: Unknown option: $argv[$i]" >&2
             usage
             exit 1
+
         case '*'
             echo "Error: Unexpected argument: $argv[$i]" >&2
             usage
             exit 1
     end
     set i (math $i + 1)
+end
+
+# Handle --init-mcp after parsing so it can use --mcp-config
+if $do_init_mcp
+    if test -z "$host_mcp_config"
+        echo "Error: --init-mcp requires --mcp-config <path>" >&2
+        exit 1
+    end
+    init_mcp_config
+    exit 0
+end
+
+# Validate MCP config file exists (if specified)
+if test -n "$host_mcp_config"; and not test -f "$host_mcp_config"
+    echo "Error: MCP config file not found: $host_mcp_config" >&2
+    echo "  Use --init-mcp to create a default config." >&2
+    exit 1
 end
 
 # --- Main ---
@@ -306,7 +359,29 @@ end
 ensure_image
 
 # Start MCP servers if configured
-start_mcp_servers
+if test -n "$host_mcp_config"
+    # When --workdir is set, cd into it so .mcp.json lands in the workdir
+    # (where the container's Claude will look for it), then return to project root
+    # for the Docker mount.
+    if test -n "$workdir"
+        set -l project_root (pwd)
+        set -l resolved_workdir
+        if string match -q '/*' "$workdir"
+            set resolved_workdir (path normalize "$workdir")
+        else
+            set resolved_workdir (path normalize "$project_root/$workdir")
+        end
+        if not string match -q '/*' "$host_mcp_config"
+            set host_mcp_config "$project_root/$host_mcp_config"
+        end
+        cd "$resolved_workdir"
+        start_mcp_servers
+        set guest_mcp_config "$resolved_workdir/$guest_mcp_config"
+        cd "$project_root"
+    else
+        start_mcp_servers
+    end
+end
 
 # Build docker run arguments
 set -l docker_args run
@@ -325,7 +400,17 @@ end
 
 # Mount workspace (mirror full host path)
 set -a docker_args -v (pwd):(pwd)
-set -a docker_args -w (pwd)
+
+# Set working directory (--workdir overrides default of pwd)
+if test -n "$workdir"
+    if string match -q '/*' "$workdir"
+        set -a docker_args -w (path normalize "$workdir")
+    else
+        set -a docker_args -w (path normalize (pwd)/"$workdir")
+    end
+else
+    set -a docker_args -w (pwd)
+end
 
 # Mount git files (only if they exist)
 if test -f "$HOME/.gitconfig"
@@ -375,7 +460,14 @@ end
 # Show what we're doing
 echo ""
 echo "Launching agents sandbox…"
-echo "  Workspace: "(pwd)" (r/w)"
+echo "  Mount: "(pwd)" (r/w)"
+if test -n "$workdir"
+    if string match -q '/*' "$workdir"
+        echo "  Workdir: "(path normalize "$workdir")
+    else
+        echo "  Workdir: "(path normalize (pwd)/"$workdir")
+    end
+end
 echo "  Config: ~/.claude -> $guest_home_folder/.claude (r/w)"
 echo "  Config: ~/.claude-sandbox.json -> $guest_home_folder/.claude.json (r/w)"
 if test -d "$HOME/.pi"
@@ -388,7 +480,8 @@ if test (count $ro_mounts) -gt 0
         echo "  Read-only: $abs_path (r/o)"
     end
 end
-if test -f "$host_mcp_config"
+if test -n "$host_mcp_config"
+    echo "  MCP config: $host_mcp_config"
     echo "  MCP servers: "(jq -r '.mcpServers | keys | join(", ")' "$host_mcp_config")
 end
 echo ""
