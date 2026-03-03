@@ -40,7 +40,7 @@ Host machine:
 
 ## MCP Config Format
 
-Both launchers use `.claude/cc-sandbox-host.mcp.json`:
+The `claude-containered` launcher requires a `--mcp-config <path>` flag pointing to a JSON config file. The `claude-sandboxed` launcher uses `.claude/cc-sandbox-host.mcp.json`. Format:
 
 ```json
 {
@@ -63,7 +63,7 @@ No automated tests. Manual testing required:
 
 ```fish
 # Test OrbStack version
-./claude-containered/claude-containered
+./claude-containered/claude-containered --mcp-config .claude/mcp-host.json
 
 # Test sandbox-exec version (from a normal terminal, not inside Claude Code)
 ./claude-sandboxed/claude-sandboxed

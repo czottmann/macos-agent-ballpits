@@ -16,7 +16,7 @@ set -g image_name "claude-containered"
 set -g host_mcp_config ""
 set -g guest_mcp_config ".mcp.json"
 set -g guest_username (whoami)
-set -g guest_home_folder "/home/$guest_username"
+set -g guest_home_folder "/Users/$guest_username"
 set -g supergateway_pids
 set -g original_context ""
 set -g generated_mcp_config false

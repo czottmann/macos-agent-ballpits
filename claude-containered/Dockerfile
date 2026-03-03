@@ -6,6 +6,7 @@ FROM debian:bookworm-slim
 
 # Build argument for username (defaults to czottmann)
 ARG USERNAME=czottmann
+ARG HOMEDIR=/Users/$USERNAME
 
 # Install required packages (without nodejs - we'll install newer version)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -32,14 +33,14 @@ RUN curl -fsSL https://go.dev/dl/go1.24.13.linux-arm64.tar.gz | tar -xz -C /usr/
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install sd (not in Debian repos, download pre-built binary)
-RUN curl -fsSL https://github.com/chmln/sd/releases/download/v1.0.0/sd-v1.0.0-aarch64-unknown-linux-musl.tar.gz \
-    | tar -xz -C /usr/local/bin --strip-components=1 sd-v1.0.0-aarch64-unknown-linux-musl/sd
+RUN curl -fsSL https://github.com/chmln/sd/releases/download/v1.1.0/sd-v1.1.0-aarch64-unknown-linux-musl.tar.gz \
+    | tar -xz -C /usr/local/bin --strip-components=1 sd-v1.1.0-aarch64-unknown-linux-musl/sd
 
 # Create symlink for fd (Debian names it fdfind)
 RUN ln -s /usr/bin/fdfind /usr/bin/fd
 
 # Create user with bash as default shell
-RUN useradd -m -s /bin/bash $USERNAME
+RUN useradd -m -s /bin/bash -d $HOMEDIR $USERNAME
 
 # Install SwiftFormat (pre-built ARM64 binary)
 RUN curl -fsSL https://github.com/nicklockwood/SwiftFormat/releases/latest/download/swiftformat_linux_aarch64.zip \
@@ -51,17 +52,21 @@ RUN curl -fsSL https://github.com/nicklockwood/SwiftFormat/releases/latest/downl
 
 # Install Claude Code, beans, pi-coding-agent, and Deno as the user
 USER $USERNAME
-WORKDIR /home/$USERNAME
-RUN mkdir -p /home/$USERNAME/.npm-global && npm config set prefix /home/$USERNAME/.npm-global
+WORKDIR $HOMEDIR
+RUN mkdir -p $HOMEDIR/.npm-global && npm config set prefix $HOMEDIR/.npm-global
 RUN curl -fsSL https://deno.land/install.sh | sh
 
 # Ensure user's local bin, Go bin, npm global bin, and Deno bin are in PATH
-ENV PATH="/home/$USERNAME/.local/bin:/home/$USERNAME/go/bin:/home/$USERNAME/.npm-global/bin:/home/$USERNAME/.deno/bin:${PATH}"
+ENV PATH="$HOMEDIR/.local/bin:$HOMEDIR/go/bin:$HOMEDIR/.npm-global/bin:$HOMEDIR/.deno/bin:${PATH}"
 
-RUN curl -fsSL https://claude.ai/install.sh | bash
-RUN claude update
-RUN npm install -g @mariozechner/pi-coding-agent
 RUN go install github.com/hmans/beans@latest
+
+# Declare the argument
+ARG CACHEBUST
+
+RUN echo "Keepin' it fresh ($CACHEBUST)"
+RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN npm install -g @mariozechner/pi-coding-agent
 
 WORKDIR /workspace
 CMD ["claude"]

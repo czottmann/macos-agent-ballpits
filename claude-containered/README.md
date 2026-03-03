@@ -21,27 +21,30 @@ Run Claude Code in a sandboxed Docker container via OrbStack with controlled fil
 
 ```fish
 # First run: builds the image automatically
-./claude-containered
+./claude-containered --mcp-config .claude/mcp-host.json
 
 # Run pre-installed pi-coding-agent instead of Claude Code
-./claude-containered -- pi
+./claude-containered --mcp-config .claude/mcp-host.json -- pi
 
 # With read-only access to additional directories
-./claude-containered --ro ~/Documents --ro ~/Reference
+./claude-containered --mcp-config .claude/mcp-host.json --ro ~/Documents --ro ~/Reference
 
 # Run a shell for manual exploration
-./claude-containered -- bash
+./claude-containered --mcp-config .claude/mcp-host.json -- bash
 ```
 
 ## Usage
 
 ```
-claude-containered [OPTIONS] [-- COMMAND...]
+claude-containered --mcp-config PATH [OPTIONS] [-- COMMAND...]
+
+ARGUMENTS:
+    --mcp-config PATH  Path to MCP server config JSON file (required)
 
 OPTIONS:
     --ro PATH       Add a read-only mount (can be repeated)
     --keep          Keep the container after exit
-    --init-mcp      Create default MCP config file
+    --init-mcp      Create default MCP config at --mcp-config path and exit
     --help          Show help
 
 COMMAND:
@@ -51,11 +54,11 @@ COMMAND:
 
 ## Persistent Config
 
-The launcher mounts your host configuration (container paths use your host username):
+The launcher mounts your host configuration into the container at matching paths (path parity with macOS):
 
-- `~/.claude` → `/home/<username>/.claude` (project data, settings)
-- `~/.claude-sandbox.json` → `/home/<username>/.claude.json` (sandbox-specific auth)
-- `~/.pi` → `/home/<username>/.pi` (pi-coding-agent config, if present)
+- `~/.claude` — project data, settings
+- `~/.claude-sandbox.json` → `~/.claude.json` — sandbox-specific auth
+- `~/.pi` — pi-coding-agent config (if present)
 
 This means:
 - You authenticate once and it persists across sessions
@@ -81,10 +84,10 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
 
 1. Create MCP config for the current project/folder (auto-detects installed servers):
    ```fish
-   ./claude-containered --init-mcp
+   ./claude-containered --mcp-config .claude/mcp-host.json --init-mcp
    ```
 
-2. This creates `.claude/cc-sandbox-host.mcp.json`:
+2. This creates the config file at the given path:
    ```json
    {
      "mcpServers": {
@@ -104,12 +107,12 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
 
 3. Run the sandbox — MCP servers start automatically:
    ```fish
-   ./claude-containered
+   ./claude-containered --mcp-config .claude/mcp-host.json
    ```
 
 ### How It Works
 
-1. Launcher reads `.claude/cc-sandbox-host.mcp.json`
+1. Launcher reads the MCP config file specified via `--mcp-config`
 2. Starts a supergateway instance for each MCP server (bridges stdio to SSE)
 3. Generates `.mcp.json` with SSE URLs for the container (**NOTE: prompts before overwriting existing file**)
 4. Claude Code inside container connects to MCP servers via `http://host.internal:<port>/sse`
@@ -117,7 +120,7 @@ The sandbox can connect to MCP servers running on your host via [supergateway](h
 
 ### Adding MCP Servers
 
-Edit `<project-root>/.claude/cc-sandbox-host.mcp.json`:
+Edit your MCP config file:
 
 ```json
 {
