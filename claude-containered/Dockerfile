@@ -28,6 +28,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# Install GitHub CLI from official repo
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Go from official source (Debian's version is too old for beans)
 RUN curl -fsSL https://go.dev/dl/go1.24.13.linux-arm64.tar.gz | tar -xz -C /usr/local
 ENV PATH="/usr/local/go/bin:${PATH}"
@@ -67,6 +75,7 @@ ARG CACHEBUST
 RUN echo "Keepin' it fresh ($CACHEBUST)"
 RUN curl -fsSL https://claude.ai/install.sh | bash
 RUN npm install -g @mariozechner/pi-coding-agent
+RUN npm install -g @openai/codex
 
 WORKDIR /workspace
 CMD ["claude"]
