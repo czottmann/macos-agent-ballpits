@@ -8,7 +8,7 @@ FROM debian:bookworm-slim
 ARG USERNAME=czottmann
 ARG HOMEDIR=/Users/$USERNAME
 
-# Install required packages (without nodejs - we'll install newer version)
+# Install system packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     curl \
@@ -17,65 +17,47 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     jq \
     ripgrep \
-    fd-find \
-    gnupg \
     sqlite3 \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 22 from NodeSource (Debian's v18 is too old for pi-coding-agent)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Create user with fish as default shell
+RUN useradd -m -s /usr/bin/fish -d $HOMEDIR $USERNAME
 
-# Install GitHub CLI from official repo
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-    | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-    | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-    && apt-get update && apt-get install -y gh \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Go from official source (Debian's version is too old for beans)
-RUN curl -fsSL https://go.dev/dl/go1.24.13.linux-arm64.tar.gz | tar -xz -C /usr/local
-ENV PATH="/usr/local/go/bin:${PATH}"
-
-# Install sd (not in Debian repos, download pre-built binary)
-RUN curl -fsSL https://github.com/chmln/sd/releases/download/v1.1.0/sd-v1.1.0-aarch64-unknown-linux-musl.tar.gz \
-    | tar -xz -C /usr/local/bin --strip-components=1 sd-v1.1.0-aarch64-unknown-linux-musl/sd
-
-# Create symlink for fd (Debian names it fdfind)
-RUN ln -s /usr/bin/fdfind /usr/bin/fd
-
-# Create user with bash as default shell
-RUN useradd -m -s /bin/bash -d $HOMEDIR $USERNAME
-
-# Install SwiftFormat (pre-built ARM64 binary)
-RUN curl -fsSL https://github.com/nicklockwood/SwiftFormat/releases/latest/download/swiftformat_linux_aarch64.zip \
-    -o /tmp/swiftformat.zip \
-    && unzip -q /tmp/swiftformat.zip -d /tmp \
-    && mv /tmp/swiftformat_linux_aarch64 /usr/local/bin/swiftformat \
-    && chmod +x /usr/local/bin/swiftformat \
-    && rm /tmp/swiftformat.zip
-
-# Install Claude Code, beans, pi-coding-agent, and Deno as the user
+# Switch to user for all remaining setup
 USER $USERNAME
+ENV SHELL=/usr/bin/fish
 WORKDIR $HOMEDIR
+
+# Install mise
+ENV MISE_YES=1
+RUN curl https://mise.run | sh
+ENV PATH="$HOMEDIR/.local/bin:$HOMEDIR/.local/share/mise/shims:${PATH}"
+
+# Install stable tools via mise
+RUN mise upgrade
+RUN mise use --global \
+    node@24 \
+    go@latest \
+    gh@latest \
+    deno@latest \
+    fd@latest \
+    sd@latest \
+    swiftformat@latest \
+    claude@latest \
+    codex@latest
+
+# Set up npm global directory and ensure Go bin is in PATH
 RUN mkdir -p $HOMEDIR/.npm-global && npm config set prefix $HOMEDIR/.npm-global
-RUN curl -fsSL https://deno.land/install.sh | sh
+ENV PATH="$HOMEDIR/.npm-global/bin:$HOMEDIR/go/bin:${PATH}"
 
-# Ensure user's local bin, Go bin, npm global bin, and Deno bin are in PATH
-ENV PATH="$HOMEDIR/.local/bin:$HOMEDIR/go/bin:$HOMEDIR/.npm-global/bin:$HOMEDIR/.deno/bin:${PATH}"
-
-RUN go install github.com/hmans/beans@latest
-
-# Declare the argument
+# CACHEBUST for fresh installs of frequently-updated tools
 ARG CACHEBUST
-
 RUN echo "Keepin' it fresh ($CACHEBUST)"
-RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Install frequently-updated tools via mise
+RUN go install github.com/hmans/beans@latest
 RUN npm install -g @mariozechner/pi-coding-agent
-RUN npm install -g @openai/codex
 
 WORKDIR /workspace
 CMD ["claude"]
