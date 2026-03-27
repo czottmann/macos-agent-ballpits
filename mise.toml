@@ -1,6 +1,11 @@
 [tasks.build-container]
 description = "Build the claude-containered Docker image"
 run = """
+export MISE_GITHUB_TOKEN=$(gh auth token -u czottmann)
 docker context use orbstack
-docker build --build-arg USERNAME=$(whoami) --build-arg CACHEBUST=$(date +%s) -t claude-containered ./claude-containered/
+docker build \
+  --build-arg USERNAME=$(whoami) \
+  --build-arg CACHEBUST=$(date +%s) \
+  --secret id=mise_github_token,env=MISE_GITHUB_TOKEN \
+  -t claude-containered ./claude-containered/
 """
