@@ -423,11 +423,17 @@ end
 # Mount .agents/ config
 set -a docker_args -v "$HOME/.agents:$guest_home_folder/.agents"
 
+# Mount .pfw/ config
+set -a docker_args -v "$HOME/.pfw:$guest_home_folder/.pfw"
+
 # Mount host Claude config (for auth and settings)
 set -a docker_args -v "$HOME/.claude:$guest_home_folder/.claude"
 
 # Mount host Codex config (for auth and settings)
 set -a docker_args -v "$HOME/.codex:$guest_home_folder/.codex"
+
+# Mount host `/Applications/Dev Builds`
+set -a docker_args -v "/Applications/Dev Builds:/Applications/Dev Builds"
 
 # Mount sandbox-specific claude.json (create if missing to avoid Docker creating a directory)
 if not test -f "$HOME/.claude-sandbox.json"
@@ -478,6 +484,7 @@ echo "  Config: ~/.agents -> $guest_home_folder/.agents (r/w)"
 echo "  Config: ~/.claude -> $guest_home_folder/.claude (r/w)"
 echo "  Config: ~/.codex -> $guest_home_folder/.codex (r/w)"
 echo "  Config: ~/.claude-sandbox.json -> $guest_home_folder/.claude.json (r/w)"
+echo "  Config: ~/.pfw -> $guest_home_folder/.pfw (r/o)"
 if test -d "$HOME/.pi"
     echo "  Config: ~/.pi -> $guest_home_folder/.pi (r/w)"
 end
