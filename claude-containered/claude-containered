@@ -66,12 +66,23 @@ REQUIRES:
 '
 end
 
+# --- Kill a process and all its descendants (post-order) ---
+# supergateway doesn't reliably forward SIGTERM to its spawned stdio MCP
+# child, so killing only the supergateway PID can leave the MCP orphaned
+# (observed with `cupertino serve`). Walk the tree via `pgrep -P` instead.
+function kill_tree --argument-names pid
+    for child in (pgrep -P $pid 2>/dev/null)
+        kill_tree $child
+    end
+    kill $pid 2>/dev/null
+end
+
 # --- Cleanup ---
 function cleanup
-    # Kill supergateway processes we started (by PID, not pattern)
+    # Kill supergateway processes we started, plus their descendants
     echo "Stopping MCP servers…"
     for pid in $supergateway_pids
-        kill $pid 2>/dev/null
+        kill_tree $pid
     end
 
     # Restore docker context
