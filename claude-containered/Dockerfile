@@ -2,7 +2,7 @@
 # Build: docker build --build-arg USERNAME=$(whoami) -t claude-containered .
 # Run: docker run --rm -it -v $(pwd):/workspace claude-containered
 
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 
 # Build argument for username (defaults to czottmann)
 ARG USERNAME=czottmann
@@ -39,18 +39,20 @@ RUN curl https://mise.run | sh
 ENV PATH="$HOMEDIR/.local/bin:$HOMEDIR/.local/share/mise/shims:${PATH}"
 
 # Install stable tools via mise
-RUN --mount=type=secret,id=mise_github_token \
+RUN --mount=type=secret,id=mise_github_token,mode=0444 \
     MISE_GITHUB_TOKEN=$(cat /run/secrets/mise_github_token 2>/dev/null) \
     mise use --global \
-    node@24 \
-    go@latest \
-    gh@latest \
-    deno@latest \
-    fd@latest \
-    sd@latest \
-    swiftformat@latest \
-    claude@latest \
-    codex@latest
+        node@24 \
+        go@latest \
+        gh@latest \
+        deno@latest \
+        fd@latest \
+        sd@latest \
+        swiftformat@latest \
+        pi@latest \
+        tuist@latest \
+        claude@latest \
+        codex@latest
 
 # Set up npm global directory and ensure Go bin is in PATH
 RUN mkdir -p $HOMEDIR/.npm-global && npm config set prefix $HOMEDIR/.npm-global
@@ -58,7 +60,6 @@ ENV PATH="$HOMEDIR/.npm-global/bin:$HOMEDIR/go/bin:${PATH}"
 
 # Install frequently-updated tools via mise
 RUN go install github.com/hmans/beans@latest
-RUN npm install -g @mariozechner/pi-coding-agent
 
 WORKDIR /workspace
 CMD ["claude"]
