@@ -14,7 +14,7 @@ end
 set -g script_dir (dirname (realpath (status filename)))
 set -g image_name "claude-containered"
 set -g host_mcp_config ""
-set -g guest_mcp_config ".mcp.json"
+set -g guest_mcp_config "/tmp/claude-containered-mcp."(date +%s)"-"(random)".json"
 set -g guest_username (whoami)
 set -g guest_home_folder "/Users/$guest_username"
 set -g supergateway_pids
@@ -163,14 +163,6 @@ function start_mcp_servers
     if not command -q npx
         echo "Error: npx is required for MCP servers but not installed" >&2
         exit 1
-    end
-
-    # Check for existing .mcp.json before we overwrite it
-    if test -f "$guest_mcp_config"
-        if not gum confirm "Overwrite existing $guest_mcp_config?"
-            echo "Aborted. Remove or rename $guest_mcp_config to continue." >&2
-            exit 1
-        end
     end
 
     echo "Starting MCP servers…"
@@ -371,27 +363,7 @@ ensure_image
 
 # Start MCP servers if configured
 if test -n "$host_mcp_config"
-    # When --workdir is set, cd into it so .mcp.json lands in the workdir
-    # (where the container's Claude will look for it), then return to project root
-    # for the Docker mount.
-    if test -n "$workdir"
-        set -l project_root (pwd)
-        set -l resolved_workdir
-        if string match -q '/*' "$workdir"
-            set resolved_workdir (path normalize "$workdir")
-        else
-            set resolved_workdir (path normalize "$project_root/$workdir")
-        end
-        if not string match -q '/*' "$host_mcp_config"
-            set host_mcp_config "$project_root/$host_mcp_config"
-        end
-        cd "$resolved_workdir"
-        start_mcp_servers
-        set guest_mcp_config "$resolved_workdir/$guest_mcp_config"
-        cd "$project_root"
-    else
-        start_mcp_servers
-    end
+    start_mcp_servers
 end
 
 # Build docker run arguments
@@ -471,6 +443,11 @@ for ro_path in $ro_mounts
     set -a docker_args -v "$abs_path:$abs_path:ro"
 end
 
+# Mount generated guest MCP config into container (if any)
+if test -n "$host_mcp_config"
+    set -a docker_args -v "$guest_mcp_config:$guest_mcp_config:ro"
+end
+
 # Image and command
 set -a docker_args "$image_name"
 # Use provided command or default to claude with --dangerously-skip-permissions
@@ -478,6 +455,10 @@ if test (count $claude_args) -gt 0
     set -a docker_args $claude_args
 else
     set -a docker_args claude --dangerously-skip-permissions
+end
+# Always inject --mcp-config so parallel runs don't rely on a workspace .mcp.json
+if test -n "$host_mcp_config"
+    set -a docker_args --mcp-config "$guest_mcp_config"
 end
 
 # Show what we're doing
