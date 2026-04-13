@@ -67,5 +67,9 @@ ENV PATH="$HOMEDIR/.npm-global/bin:$HOMEDIR/go/bin:${PATH}"
 # Install frequently-updated tools via mise
 RUN go install github.com/hmans/beans@latest
 
+# Log in to forgejo instance
+RUN --mount=type=secret,id=fj_auth_token,mode=0444 \
+    fj --host git.zottmann.dev auth add-key czottmann $(cat /run/secrets/fj_auth_token 2>/dev/null)
+
 WORKDIR /workspace
 CMD ["claude"]

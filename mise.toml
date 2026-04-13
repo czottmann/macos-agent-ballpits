@@ -2,10 +2,12 @@
 description = "Build the claude-containered Docker image"
 run = """
 export MISE_GITHUB_TOKEN=$(gh auth token -u czottmann)
+export FJ_AUTH_TOKEN=$(security find-generic-password -s "git.zottmann.dev: Auth token claude-containered" -w)
 docker context use orbstack
 docker build \
   --build-arg USERNAME=$(whoami) \
   --build-arg CACHEBUST=$(date +%s) \
   --secret id=mise_github_token,env=MISE_GITHUB_TOKEN \
+  --secret id=fj_auth_token,env=FJ_AUTH_TOKEN \
   -t claude-containered ./claude-containered/
 """
