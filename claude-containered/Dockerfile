@@ -9,17 +9,21 @@ ARG USERNAME=czottmann
 ARG HOMEDIR=/Users/$USERNAME
 
 # Install system packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends \
     bash \
-    curl \
+    build-essential \
     ca-certificates \
+    curl \
     fish \
     git \
     jq \
+    libssl-dev \
+    pkg-config \
     ripgrep \
     sqlite3 \
     unzip \
-    && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/*
 
 # Create user with fish as default shell
 RUN useradd -m -s /usr/bin/fish -d $HOMEDIR $USERNAME
@@ -42,17 +46,19 @@ ENV PATH="$HOMEDIR/.local/bin:$HOMEDIR/.local/share/mise/shims:${PATH}"
 RUN --mount=type=secret,id=mise_github_token,mode=0444 \
     MISE_GITHUB_TOKEN=$(cat /run/secrets/mise_github_token 2>/dev/null) \
     mise use --global \
-        node@24 \
-        go@latest \
-        gh@latest \
+        rust@latest \
+        cargo:forgejo-cli@latest \
+        claude@latest \
+        codex@latest \
         deno@latest \
         fd@latest \
+        gh@latest \
+        go@latest \
+        node@24 \
+        pi@latest \
         sd@latest \
         swiftformat@latest \
-        pi@latest \
-        tuist@latest \
-        claude@latest \
-        codex@latest
+        tuist@latest
 
 # Set up npm global directory and ensure Go bin is in PATH
 RUN mkdir -p $HOMEDIR/.npm-global && npm config set prefix $HOMEDIR/.npm-global
