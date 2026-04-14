@@ -399,8 +399,9 @@ end
 if test -f "$HOME/.gitconfig"
     set -a docker_args -v "$HOME/.gitconfig:$guest_home_folder/.gitconfig"
 end
-if test -f "$HOME/.git-credentials"
-    set -a docker_args -v "$HOME/.git-credentials:$guest_home_folder/.git-credentials"
+set -l git_creds_host_dir "$HOME/.config/claude-containered"
+if test -f "$git_creds_host_dir/git-credentials"
+    set -a docker_args -v "$git_creds_host_dir:/run/claude-containered"
 end
 
 # Mount .agents/ config
@@ -471,6 +472,9 @@ if test -n "$workdir"
     else
         echo "  Workdir: "(path normalize (pwd)/"$workdir")
     end
+end
+if test -f "$git_creds_host_dir/git-credentials"
+    echo "  Config: ~/.config/claude-containered/ -> /run/claude-containered/ (r/w, for git-credentials)"
 end
 echo "  Config: ~/.agents -> $guest_home_folder/.agents (r/w)"
 echo "  Config: ~/.claude -> $guest_home_folder/.claude (r/w)"
