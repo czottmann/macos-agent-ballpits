@@ -384,6 +384,27 @@ if set -q COLORTERM
     set -a docker_args -e COLORTERM
 end
 
+# Forward Anthropic/Claude env vars so callers can route Claude Code to
+# alternate Anthropic-compatible providers (e.g. `set -x ANTHROPIC_BASE_URL …`
+# before invoking this script). `-e VAR` (no =value) tells Docker to read the
+# value from the host process's env at run time.
+for var in \
+    ANTHROPIC_BASE_URL \
+    ANTHROPIC_AUTH_TOKEN \
+    ANTHROPIC_API_KEY \
+    ANTHROPIC_MODEL \
+    ANTHROPIC_DEFAULT_OPUS_MODEL \
+    ANTHROPIC_DEFAULT_SONNET_MODEL \
+    ANTHROPIC_DEFAULT_HAIKU_MODEL \
+    CLAUDE_CODE_SUBAGENT_MODEL \
+    CLAUDE_CODE_EFFORT_LEVEL \
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC \
+    CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK
+    if set -q $var
+        set -a docker_args -e $var
+    end
+end
+
 # Mount workspace (mirror full host path)
 set -a docker_args -v (pwd):(pwd)
 
@@ -412,6 +433,9 @@ set -a docker_args -v "$HOME/.agents:$guest_home_folder/.agents"
 
 # Mount .pfw/ config
 set -a docker_args -v "$HOME/.pfw:$guest_home_folder/.pfw"
+
+# Mount host tmp folder
+set -a docker_args -v "/var/folders:/var/folders"
 
 # Mount host Claude config (for auth and settings)
 set -a docker_args -v "$HOME/.claude:$guest_home_folder/.claude"
@@ -452,6 +476,11 @@ if test -n "$host_mcp_config"
     set -a docker_args -v "$guest_mcp_config:$guest_mcp_config:ro"
 end
 
+# Mount generated guest MCP config into container (if any)
+if test -n "$HOME/.config/pushover-cli"
+    set -a docker_args -v "$HOME/.config/pushover-cli:$guest_home_folder/.config/pushover-cli:ro"
+end
+
 # Image and command
 set -a docker_args "$image_name"
 # Use provided command or default to claude with --dangerously-skip-permissions
@@ -461,7 +490,7 @@ if test (count $claude_args) -gt 0
     set agent $claude_args[1]
     set -a docker_args $claude_args
 else
-    set -a docker_args claude --dangerously-skip-permissions
+    set -a docker_args claude --allow-dangerously-skip-permissions --dangerously-skip-permissions
 end
 
 # Inject the MCP config the way the target agent understands it, so parallel
@@ -501,7 +530,7 @@ if test -d "$HOME/.pi"
 end
 if test (count $ro_mounts) -gt 0
     for ro_path in $ro_mounts
-        set -l expanded_path (eval echo $ro_path)
+        set -l expanded_path (string replace -r '^~' $HOME $ro_path)
         set -l abs_path (realpath "$expanded_path")
         echo "  Read-only: $abs_path (r/o)"
     end
