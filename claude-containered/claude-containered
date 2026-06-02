@@ -202,13 +202,16 @@ function start_mcp_servers
             set full_command "$command $args"
         end
 
-        # Start supergateway in background (log to temp file for debugging)
+        # Start supergateway in background (log to temp file for debugging).
+        # --stateful keeps one stdio child per session; without it, supergateway
+        # runs in stateless mode and spawns a fresh stdio child (e.g. a new
+        # `npx -y xcodebuildmcp@latest mcp`) on *every* request.
         # Use env command to set environment variables if any are defined
         set -l logfile "/tmp/supergateway-$server-"(random)".log"
         if test (count $env_pairs) -gt 0
-            nohup env $env_pairs npx -y supergateway --stdio "$full_command" --outputTransport streamableHttp --port "$port" >"$logfile" 2>&1 &
+            nohup env $env_pairs npx -y supergateway --stdio "$full_command" --outputTransport streamableHttp --stateful --port "$port" >"$logfile" 2>&1 &
         else
-            nohup npx -y supergateway --stdio "$full_command" --outputTransport streamableHttp --port "$port" >"$logfile" 2>&1 &
+            nohup npx -y supergateway --stdio "$full_command" --outputTransport streamableHttp --stateful --port "$port" >"$logfile" 2>&1 &
         end
         disown
         set -l pid $last_pid
