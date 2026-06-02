@@ -22,6 +22,7 @@ set -g original_context ""
 set -g generated_mcp_config false
 set -g assigned_ports  # Tracks ports assigned during this session
 set -g server_ports    # Parallel array: server_ports[i] is the port for servers[i]
+set -g codex_mcp_overrides  # `-c` overrides for codex (reads TOML, not --mcp-config)
 
 # --- Help ---
 function usage
@@ -34,8 +35,8 @@ Runs Claude Code (with --dangerously-skip-permissions) inside a Docker
 container managed by OrbStack. The current directory is mounted as the
 workspace. MCP servers defined in the --mcp-config JSON file are started
 on the host and bridged into the container via supergateway
-(stdio → HTTP/SSE), so tools like xcodebuild work without nested
-sandbox issues.
+(stdio → streamable HTTP), so tools like xcodebuild work without
+nested sandbox issues.
 
 USAGE:
     claude-containered [OPTIONS] [-- CLAUDE_ARGS…]
@@ -205,9 +206,9 @@ function start_mcp_servers
         # Use env command to set environment variables if any are defined
         set -l logfile "/tmp/supergateway-$server-"(random)".log"
         if test (count $env_pairs) -gt 0
-            nohup env $env_pairs npx -y supergateway --stdio "$full_command" --port "$port" >"$logfile" 2>&1 &
+            nohup env $env_pairs npx -y supergateway --stdio "$full_command" --outputTransport streamableHttp --port "$port" >"$logfile" 2>&1 &
         else
-            nohup npx -y supergateway --stdio "$full_command" --port "$port" >"$logfile" 2>&1 &
+            nohup npx -y supergateway --stdio "$full_command" --outputTransport streamableHttp --port "$port" >"$logfile" 2>&1 &
         end
         disown
         set -l pid $last_pid
@@ -241,8 +242,10 @@ function start_mcp_servers
         set -l port $server_ports[$i]
         set guest_config (echo "$guest_config" | jq \
             --arg server "$server" \
-            --arg url "http://host.internal:$port/sse" \
-            '.mcpServers[$server] = {type: "sse", url: $url}')
+            --arg url "http://host.internal:$port/mcp" \
+            '.mcpServers[$server] = {type: "http", url: $url}')
+        # codex doesn't read --mcp-config; collect equivalent TOML `-c` overrides
+        set -a codex_mcp_overrides -c "mcp_servers.$server.url=\"http://host.internal:$port/mcp\""
         set i (math $i + 1)
     end
 
@@ -452,14 +455,26 @@ end
 # Image and command
 set -a docker_args "$image_name"
 # Use provided command or default to claude with --dangerously-skip-permissions
+# (the first token of $claude_args is the target agent, e.g. claude/pi/codex)
+set -l agent claude
 if test (count $claude_args) -gt 0
+    set agent $claude_args[1]
     set -a docker_args $claude_args
 else
     set -a docker_args claude --dangerously-skip-permissions
 end
-# Always inject --mcp-config so parallel runs don't rely on a workspace .mcp.json
+
+# Inject the MCP config the way the target agent understands it, so parallel
+# runs don't rely on a workspace .mcp.json. claude and pi accept
+# `--mcp-config <json>`; codex reads TOML and takes per-server `-c` URL
+# overrides instead (it errors on the unknown --mcp-config flag).
 if test -n "$host_mcp_config"
-    set -a docker_args --mcp-config "$guest_mcp_config"
+    switch $agent
+        case codex
+            set -a docker_args $codex_mcp_overrides
+        case '*'
+            set -a docker_args --mcp-config "$guest_mcp_config"
+    end
 end
 
 # Show what we're doing
